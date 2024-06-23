@@ -1,0 +1,8 @@
+{{- include "prechecks" . -}}
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    control-plane: kubeflow
+    istio-injection: enabled
+  name: kubeflow
