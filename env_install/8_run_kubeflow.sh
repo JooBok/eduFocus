@@ -11,5 +11,5 @@ while ! kustomize build example | kubectl apply -f -; do echo "Retrying to apply
 
 cd ../https_setting/
 
-k apply -f certificate.yaml
-k apply -f gateway.yaml
+kubectl apply -f certificate.yaml
+kubectl apply -f gateway.yaml
