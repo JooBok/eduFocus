@@ -1,6 +1,5 @@
 #!/bin/bash
 sudo apt-get -y update
-sudo apt-get -y remove --purge '^nvidia-.*'
 sudo apt-get -y remove --purge 'cuda-.*'
 sudo apt-get -y install nvidia-cuda-toolkit
 nvcc -V
@@ -22,5 +21,5 @@ echo "export LD_LIBRARY_PATH=/usr/lib/cuda/lib64:$LD_LIBRARY_PATH" >> ~/.bashrc
 export "LD_LIBRARY_PATH=/usr/lib/cuda/include:$LD_LIBRARY_PATH" >> ~/.bashrc
 source ~/.bashrc
 
-sudo apt install -y nvidia-driver-550
+sudo apt-get install -y nvidia-driver-550
 echo "reboot....."
