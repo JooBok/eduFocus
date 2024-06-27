@@ -1,9 +1,4 @@
 #! /bin/bash
-
-minikube start --gpus nvidia --memory=8192 --cpus=16
-
-minikube kubectl -- get pods -A
-
 echo "초기 실행에 30분정도 소요됩니다."
 echo "초기 실행에 30분정도 소요됩니다."
 echo "초기 실행에 30분정도 소요됩니다."
