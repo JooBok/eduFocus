@@ -15,10 +15,9 @@ spec:
       labels:
         app: minio
     spec:
-      automountServiceAccountToken: false
       containers:
         - name: main
-          image: minio/minio:RELEASE.2022-11-17T23-20-09Z
+          image: minio/minio
           env:
             - name: MINIO_ACCESS_KEY
               value: admin

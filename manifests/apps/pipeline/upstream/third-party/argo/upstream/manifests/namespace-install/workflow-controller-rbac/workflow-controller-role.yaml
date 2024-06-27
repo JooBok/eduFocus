@@ -51,7 +51,6 @@ rules:
       - workflows/finalizers
       - workflowtasksets
       - workflowtasksets/finalizers
-      - workflowartifactgctasks
     verbs:
       - get
       - list
@@ -69,6 +68,13 @@ rules:
       - get
       - list
       - watch
+  - apiGroups:
+      - ""
+    resources:
+      - serviceaccounts
+    verbs:
+      - get
+      - list
   - apiGroups:
       - argoproj.io
     resources:

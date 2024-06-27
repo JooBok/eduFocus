@@ -16,7 +16,6 @@ spec:
       labels:
         app: mysql
     spec:
-      automountServiceAccountToken: false
       containers:
         - name: main
           image: mysql:8
@@ -32,9 +31,9 @@ spec:
           ports:
             - containerPort: 3306
           readinessProbe:
-            tcpSocket:
-              port: 3306
-            initialDelaySeconds: 30
-            periodSeconds: 10
+            exec:
+              command: ["mysql", "-u", "mysql", "-ppassword", "argo", "-e", "SELECT 1"]
+            initialDelaySeconds: 15
+            timeoutSeconds: 2
       nodeSelector:
         kubernetes.io/os: linux

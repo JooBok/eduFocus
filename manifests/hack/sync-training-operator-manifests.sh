@@ -9,13 +9,11 @@
 #
 # Afterwards the developers can submit the PR to the kubeflow/manifests
 # repo, based on that local branch
-# It must be executed directly from its directory
 
 # strict mode http://redsymbol.net/articles/unofficial-bash-strict-mode/
-set -euxo pipefail
+set -euo pipefail
 IFS=$'\n\t'
 
-COMMIT="v1.8.0-rc.0" # You can use tags as well
 SRC_DIR=${SRC_DIR:=/tmp/kubeflow-training-operator}
 BRANCH=${BRANCH:=sync-kubeflow-training-operator-manifests-${COMMIT?}}
 
@@ -24,46 +22,34 @@ MANIFESTS_DIR=$(dirname $SCRIPT_DIR)
 
 echo "Creating branch: ${BRANCH}"
 
+# DEV: Comment out this if when local testing
 if [ -n "$(git status --porcelain)" ]; then
-  echo "WARNING: You have uncommitted changes"
+  # Uncommitted changes
+  echo "WARNING: You have uncommitted changes, exiting..."
+  exit 1
 fi
 
 if [ `git branch --list $BRANCH` ]
 then
-   echo "WARNING: Branch $BRANCH already exists."
+   echo "WARNING: Branch $BRANCH already exists. Exiting..."
+   exit 1
 fi
 
-# Create the branch in the manifests repository
-if ! git show-ref --verify --quiet refs/heads/$BRANCH; then
-  git checkout -b $BRANCH
-else
-    echo "Branch $BRANCH already exists."
-fi
+# DEV: Comment out this checkout command when local testing
+git checkout -b $BRANCH
 
 echo "Checking out in $SRC_DIR to $COMMIT..."
-
-# Checkout the Training Operator repository
-mkdir -p $SRC_DIR
 cd $SRC_DIR
-if [ ! -d "training-operator/.git" ]; then
-    git clone https://github.com/kubeflow/training-operator.git
-fi
-cd $SRC_DIR/training-operator
-if ! git rev-parse --verify --quiet $COMMIT; then
-    git checkout -b $COMMIT
-else
-    git checkout $COMMIT
-fi
-
 if [ -n "$(git status --porcelain)" ]; then
-  echo "WARNING: You have uncommitted changes"
+  # Uncommitted changes
+  echo "WARNING: You have uncommitted changes, exiting..."
+  exit 1
 fi
+git checkout $COMMIT
 
 echo "Copying training-operator manifests..."
 DST_DIR=$MANIFESTS_DIR/apps/training-operator/upstream
-if [ -d "$DST_DIR" ]; then
-    rm -r "$DST_DIR"
-fi
+rm -r $DST_DIR
 cp $SRC_DIR/manifests $DST_DIR -r
 
 
@@ -75,9 +61,9 @@ DST_TXT="\[$COMMIT\](https://github.com/kubeflow/training-operator/tree/$COMMIT/
 
 sed -i "s|$SRC_TXT|$DST_TXT|g" ${MANIFESTS_DIR}/README.md
 
-# DEV: Comment out these commands if you are testing locally
+# DEV: Comment out these commands when local testing
 echo "Committing the changes..."
 cd $MANIFESTS_DIR
 git add apps
 git add README.md
-git commit -s -m "Update kubeflow/training-operator manifests from ${COMMIT}"
+git commit -m "Update kubeflow/training-operator manifests from ${COMMIT}"

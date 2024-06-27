@@ -5,37 +5,25 @@ kind: Kustomization
 resources:
 - profile-instance.yaml
 configMapGenerator:
-- envs:
+- name: default-install-config
+  envs:
   - params.env
-  name: default-install-config
+vars:
 # These vars are used for substituing in the parameters from the config map
 # into the Profiles custom resource.
+- name: user
+  objref:
+    kind: ConfigMap
+    name: default-install-config
+    apiVersion: v1
+  fieldref:
+    fieldpath: data.user
+- name: profile-name
+  objref:
+    kind: ConfigMap
+    name: default-install-config
+    apiVersion: v1
+  fieldref:
+    fieldpath: data.profile-name
 configurations:
 - params.yaml
-replacements:
-- source:
-    fieldPath: data.user
-    kind: ConfigMap
-    name: default-install-config
-    version: v1
-  targets:
-  - fieldPaths:
-    - spec.owner.name
-    select:
-      group: kubeflow.org
-      kind: Profile
-      name: $(profile-name)
-      version: v1beta1
-- source:
-    fieldPath: data.profile-name
-    kind: ConfigMap
-    name: default-install-config
-    version: v1
-  targets:
-  - fieldPaths:
-    - metadata.name
-    select:
-      group: kubeflow.org
-      kind: Profile
-      name: $(profile-name)
-      version: v1beta1

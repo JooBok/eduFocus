@@ -1,4 +1,0 @@
-namespace: kubeflow
-resources:
-- ../../base
-- namespace.yaml
