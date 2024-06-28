@@ -13,3 +13,4 @@ cd ../https_setting/
 
 kubectl apply -f certificate.yaml
 kubectl apply -f gateway.yaml
+kubectl apply -f profile.yaml
