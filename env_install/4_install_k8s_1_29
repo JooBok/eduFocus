@@ -1,5 +1,6 @@
 #! /bin/bash
 
+### kubectl 1.29버전 다운로드 스크립트입니다.(공식문서 참조)  ###
 sudo apt-get update
 sudo apt-get install -y apt-transport-https ca-certificates curl gnupg
 
@@ -18,10 +19,5 @@ echo 'source /usr/share/bash-completion/bash_completion' >>~/.bashrc
 echo 'source <(kubectl completion bash)' >>~/.bashrc
 echo 'alias k=kubectl' >>~/.bashrc
 echo 'complete -o default -F __start_kubectl k' >>~/.bashrc
-
-source /usr/share/bash-completion/bash_completion
-source <(kubectl completion bash) 
-alias k=kubectl
-complete -o default -F __start_kubectl k 
 
 source ~/.bashrc
