@@ -1,5 +1,7 @@
 #!/bin/bash
-
+### linux 기반 cuda/ cudnn 설치 스크립트입니다. ###
+### 이미 설치 되어있다면 실행하지 마세요. ###
+### 버전은 gpu에 맞는 버전으로 변경해주세요 (CUDNN_VERSION, CUDA_VERSION, CUDNN_TAR_FILE)
 set -e
 
 sudo apt-get -y update
@@ -20,6 +22,8 @@ wget https://developer.download.nvidia.com/compute/redist/cudnn/v${CUDNN_VERSION
 tar -xf ${CUDNN_TAR_FILE}
 mv cudnn-linux-x86_64-${CUDNN_VERSION}_cuda${CUDA_VERSION}-archive cuda
 
+### cuda toolkit이 /usr/local/ 디렉토리 하위에 설치되는것을 가정으로 작성되었습니다. ###
+### 만약 /usr/lib/ 디렉토리 하위에 cuda toolkit이 설치되었다면 아래의 경로를 수정해주세요. ###
 sudo cp cuda/include/cudnn*.h /usr/local/cuda/include/
 sudo cp cuda/lib/libcudnn* /usr/local/cuda/lib64/
 sudo chmod a+r /usr/local/cuda/lib64/libcudnn*
