@@ -10,7 +10,7 @@ function ctrl_c() {
         kill -KILL $ISTIO_PID
 }
 
-kubectl port-forward -n istio-system svc/istio-ingressgateway 8080:80 &
+kubectl port-forward -n istio-system svc/istio-ingressgateway 8080:443 &
 ISTIO_PID=$!
 echo "Started Istio port-forward, pid: $ISTIO_PID"
 echo ISTIO_PID=$ISTIO_PID >> pids.env
