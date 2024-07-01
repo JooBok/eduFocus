@@ -12,6 +12,6 @@ echo "Running the tests."""
 python3 mnist.py
 
 echo "Cleaning up opened processes."""
-./hack/cleanup_proxies.sh
+# ./hack/cleanup_proxies.sh
 
 echo "Leaving the cluster as is for further inspection."
