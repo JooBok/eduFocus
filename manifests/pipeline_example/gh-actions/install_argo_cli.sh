@@ -8,7 +8,7 @@ curl -sLO https://github.com/argoproj/argo-workflows/releases/download/v3.1.3/ar
 gunzip argo-linux-amd64.gz
 
 # Make binary executable
-chmod +x argo-linux-amd64
+sudo chmod +x argo-linux-amd64
 
 # Move binary to path
-mv ./argo-linux-amd64 /usr/local/bin/argo
+sudo mv ./argo-linux-amd64 /usr/local/bin/argo
