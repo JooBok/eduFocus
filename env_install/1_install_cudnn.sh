@@ -5,6 +5,7 @@
 set -e
 
 sudo apt-get -y update
+sudo apt-get -y remove --purge '^nvidia-.*'
 sudo apt-get -y remove --purge 'cuda-.*'
 sudo apt-get -y install nvidia-cuda-toolkit
 
@@ -29,10 +30,10 @@ sudo cp cuda/lib/libcudnn* /usr/local/cuda/lib64/
 sudo chmod a+r /usr/local/cuda/lib64/libcudnn*
 sudo chmod a+r /usr/local/cuda/include/cudnn*.h
 
-echo "export LD_LIBRARY_PATH=/usr/lib/cuda/lib64:$LD_LIBRARY_PATH" >> ~/.bashrc
-export "LD_LIBRARY_PATH=/usr/lib/cuda/include:$LD_LIBRARY_PATH" >> ~/.bashrc
+echo "export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH" >> ~/.bashrc
+export "LD_LIBRARY_PATH=/usr/local/cuda/include:$LD_LIBRARY_PATH" >> ~/.bashrc
 source ~/.bashrc
 
-sudo apt-get install -y nvidia-driver-460
+sudo apt-get install -y nvidia-driver-525
 
 echo "Please reboot system"
