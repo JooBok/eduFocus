@@ -32,8 +32,8 @@ pipeline.py파일 실행시 ADHD 분류와 집중도 측정이 동시에 이루�
 구현할 순서(mediapipe/deepgaze 모델)
 
 1. 웹 캠으로 1분 57초짜리 얼굴 영상 mp4파일 만들기 >> ㅇ
-2. 1에서 만들어진 mp4파일 1FPS단위로 이미지 만들어서 /input_data/user_id1/user_face에 넣기
-3. /input_data/user_id1/contents에 있는 mp4파일 1FPS단위로 이미지 만들기
+2. 1에서 만들어진 mp4파일 1FPS단위로 이미지 만들어서 /input_data/user_id1/user_face에 넣기 >> ㅇ
+3. /input_data/user_id1/contents에 있는 mp4파일 1FPS단위로 이미지 만들기 >> ㅇ
 - 여기까지 하면 모델에 들어갈 input data 완성!!
 4. mediapipe모델에 필요한 파이썬 파일 만들기
 5. input data로 mediapipe모델 돌려서 결과 확인하기
