@@ -2,3 +2,8 @@ opencv_python
 mediapipe
 pandas
 scikit_learn
+numpy
+matplotlib
+torch
+pysaliency
+torchvision
