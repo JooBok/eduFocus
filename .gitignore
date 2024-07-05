@@ -1,2 +1,4 @@
 *_data
+*contents
 venv
+__pycache__
