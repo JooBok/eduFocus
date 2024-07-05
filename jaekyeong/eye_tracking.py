@@ -11,7 +11,7 @@ from scipy.spatial.transform import Rotation
 
 mp_face_mesh = mp.solutions.face_mesh
 ### VV face mash 초기화 ###
-face_mesh = mp_face_mesh.FaceMesh(refine_landmarks=True, min_detection_confidence=0.7, min_tracking_confidence=0.7)
+face_mesh = mp_face_mesh.FaceMesh(refine_landmarks=True, min_detection_confidence=0.5, min_tracking_confidence=0.5)
 mp_drawing = mp.solutions.drawing_utils
 
 ###################################################### 웹캠 설정 ######################################################
@@ -30,7 +30,7 @@ cv2.resizeWindow('MediaPipe Iris Gaze', 1280, 720)
 
 class GazeCalibration:
     def __init__(self):
-        ### VV 캘리브레이션 테스트 순서 ###
+        ### VV 캘리브레이션 순서 ###
         self.calibration_points = [
             (0, 0),     # 중앙
             (-1, 1),    # 왼쪽 상단
@@ -39,15 +39,16 @@ class GazeCalibration:
             (-1, -1)    # 왼쪽 하단
         ]
         self.collected_data = []
+        ### calibrate 좌표 학습 모델 인스턴스 생성 ###
         self.model_x = LinearRegression()
         self.model_y = LinearRegression()
-        ### VV 캘리브레이션 횟수 ###
+        ### VV 캘리브레이션 횟수 -> 3 설정시 중앙3회 -> 왼쪽상단3회 ... 방식으로 작동 ###
         self.samples_per_point = 3
-        ### 변수 초기화 ###
+
         self.current_samples = 0
         self.is_calibrated = False
 
-    ############################ 검사 횟수 설정 ############################
+    #######################################################################
     def collect_data(self, gaze_point):
         self.collected_data.append(gaze_point)
         self.current_samples += 1
@@ -106,6 +107,13 @@ class GazeBuffer:
         return np.mean(self.buffer, axis=0)
 
 class GazeFixation:
+    """
+    VV
+    시선좌표와 시간데이터를 저장하여 속도를 측정하여 fixation 설정
+    velocity_threshold: 평균 속도가 이 값보다 낮을 때, 시선이 고정된 것으로 간주 (픽셀/s)
+    duration: 시선이 고정된 상태로 인식되기 위해 요구되는 최소 지속 시간
+    window_size: 이전 프레임과의 연계 (프레임 개수)
+    """
     def init(self, velocity_threshold=0.1, duration=0.4, window_size=3):
         self.velocity_threshold = velocity_threshold
         self.duration = duration
@@ -144,18 +152,15 @@ def calculate_distance(iris_landmarks, image_height):
     distance = np.linalg.norm(np.array(left_iris) - np.array(right_iris))
     estimated_distance = (1 / distance) * image_height
     return estimated_distance
-
+### 3차원 평균 계산 ###
 def get_center(landmarks):
     return np.mean([[lm.x, lm.y, lm.z] for lm in landmarks], axis=0)
-
-def draw_point(image, point, color=(0, 255, 0)):
-    cv2.circle(image, (int(point[0]), int(point[1])), 5, color, -1)
-
+### 시선 좌표 계산 공식 ###
 def estimate_gaze(eye_center, iris_center, estimated_distance):
     eye_vector = iris_center - eye_center
     gaze_point = eye_center + eye_vector * estimated_distance
     return gaze_point
-
+### 왼쪽좌표와 오른쪽 좌표 평균 ###
 def calculate_combined_gaze(left_gaze, right_gaze):
     return (left_gaze + right_gaze) / 2
 
@@ -200,7 +205,9 @@ def limit_gaze_to_screen(gaze_point_x, gaze_point_y, screen_width, screen_height
     gaze_point_y = min(max(gaze_point_y, 0), screen_height - 1)
     return gaze_point_x, gaze_point_y
 
-# 캘리브레이션 객체 생성
+############################################################ main code ############################################################
+
+### 클래스 인스턴스 생성 ###
 calibration = GazeCalibration()
 gaze_buffer = GazeBuffer()
 gaze_fixation = GazeFixation()
@@ -208,12 +215,9 @@ calibration_index = 0
 is_calibrated = False
 prev_gaze = None    
 
-# FPS 계산을 위한 변수
-prev_frame_time = 0
-new_frame_time = 0
-
-# 체크 간격 설정
+### VV calibration 간격 설정 ###
 calibration_check_interval = 1.5
+### calibration 종료 후 시선 추적 시간 설정 ###
 normal_check_interval = 0.05
 
 last_check_time = time.time()
@@ -221,16 +225,8 @@ last_check_time = time.time()
 while cap.isOpened():
     success, image = cap.read()
     if not success:
-        print("웹캠을 찾을 수 없습니다.")
         break
 
-    # FPS 계산
-    new_frame_time = time.time()
-    fps = 1 / (new_frame_time - prev_frame_time)
-    prev_frame_time = new_frame_time
-    cv2.putText(image, f"FPS: {int(fps)}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
-
-    # 이미지를 BGR에서 RGB로 변환
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     results = face_mesh.process(image_rgb)
 
@@ -243,39 +239,32 @@ while cap.isOpened():
 
             if results.multi_face_landmarks:
                 for face_landmarks in results.multi_face_landmarks:
-                    # 랜드마크 그리기
+
                     mp_drawing.draw_landmarks(
                         image, face_landmarks, mp_face_mesh.FACEMESH_TESSELATION,
                         mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=1, circle_radius=1),
                         mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=1))
-                    
-                    # # 홍채 랜드마크 추출
-                    # left_iris = get_center(face_landmarks.landmark[468:473])
-                    # right_iris = get_center(face_landmarks.landmark[473:478])
-                    # # 눈 랜드마크 추출
-                    # left_eye = get_center(face_landmarks.landmark[33:42])
-                    # right_eye = get_center(face_landmarks.landmark[263:272])
-                    
-                    # 랜드마크 인덱스 수정
+
+                    ### 랜드마크 인덱스 수정 ###
                     left_iris = np.mean([[lm.x, lm.y, lm.z] for lm in face_landmarks.landmark[468:474]], axis=0)[:3]
                     right_iris = np.mean([[lm.x, lm.y, lm.z] for lm in face_landmarks.landmark[473:479]], axis=0)[:3]
                     left_eye = np.mean([[lm.x, lm.y, lm.z] for lm in face_landmarks.landmark[33:42]], axis=0)[:3]
                     right_eye = np.mean([[lm.x, lm.y, lm.z] for lm in face_landmarks.landmark[263:272]], axis=0)[:3]
 
-                    # 거리 계산
+                    ### 거리 계산 ###
                     estimated_distance = calculate_distance([left_iris, right_iris], image.shape[0])
 
-                    # 시선 추정
+                    ### 시선 추정 ###
                     left_gaze = estimate_gaze(left_eye, left_iris, estimated_distance)
                     right_gaze = estimate_gaze(right_eye, right_iris, estimated_distance)
 
-                    # 머리 포즈 추정
+                    ### 머리 포즈 추정 ###
                     head_rotation = estimate_head_pose(face_landmarks)
 
                     left_gaze_corrected = correct_gaze_vector(left_gaze, head_rotation)
                     right_gaze_corrected = correct_gaze_vector(right_gaze, head_rotation)
 
-                    # 통합된 시선 계산 (보정된 벡터 사용)
+                    ### 시선 통합 ###
                     combined_gaze = calculate_combined_gaze(left_gaze_corrected, right_gaze_corrected)
 
                     if calibration_index < len(calibration.calibration_points):
@@ -347,21 +336,42 @@ while cap.isOpened():
                             screen_y = int((-normalized_gaze[1] + 1) * h / 2)
                             screen_x, screen_y = limit_gaze_to_screen(screen_x, screen_y, w, h)
                             screen_x, screen_y = screen_x * 2, screen_y * 0.8
-
-                            draw_point(image, (screen_x, screen_y), (255, 255, 0))
+                            
+                            cv2.circle(image, (int(screen_x), int(screen_y)), 5, (255, 255, 0), -1)
                             print(f"Calibrated gaze point: ({screen_x}, {screen_y})")
 
                             is_fixed = gaze_fixation.update((screen_x, screen_y))
-                            if is_fixed:
-                                print("Gaze is fixed")
-                    else:
-                        print("캘리브레이션이 완료되지 않았습니다.")
             else:
                 print(f"얼굴인식 불가")
 
     cv2.imshow('MediaPipe Iris Gaze', image)
-    if cv2.waitKey(1) & 0xFF == 27:  # ESC 키를 누르면 종료
+    ### ESC키 누르면 종료 ###
+    if cv2.waitKey(1) & 0xFF == 27:
         break
 
 cap.release()
 cv2.destroyAllWindows()
+
+### 해결된 문제 ###
+
+# 속도로 fixation 측정 -> 심각한 시선 흔들림을 완화함 
+
+### 현재 문제점 ###
+
+# y좌표는 제대로 이동하나 x좌표의 이동 속도가 느림
+# 캘리브레이션 하지 않은 행동시 시선 인식 불가능 -> hmm...
+# 화면 중앙으로 시선 이동시에, 이동 전 시선 좌표가 찍히던 곳에 좌표가 고정되는 현상
+
+### 추가할 것 ###
+
+# 현재 문제 디버깅
+# 머리의 회전 말고도 여러가지 행동을 추가하여 계산
+# np.mean 대신 average를 사용하여 가중치 부여? (알아봐야함)
+# 버튼을 클릭하여 캘리브레이션을 진행하고 싶음 (예 -> q: 중앙, w: 왼쪽 상단 등등..)
+
+### 고민 ###
+
+# 실시간 서비스에 어떻게 캘리브레이션을 진행?
+# 밀크티 회원 가입시 -> 집중력 서비스를 이용하려면 간단한 테스트를 해야한다고 설명드리고 캘리브레이션을 진행하여 회원별로 좌표값을 저장 후 사용
+# --->>> 한계점: 애기가 학습하는 환경이나 장소에 따라 값이 달라질 가능성이 있음.....
+# 캘리브레이션 데이터를 저장 후 다른 환경에서 저장값을 가져와 사용하는 테스트가 필요할 듯 함
