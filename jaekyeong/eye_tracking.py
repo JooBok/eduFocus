@@ -66,7 +66,7 @@ class GazeCalibration:
             X = np.array(self.collected_data)
             y_x = np.repeat([point[0] for point in self.calibration_points], self.samples_per_point)
             y_y = np.repeat([point[1] for point in self.calibration_points], self.samples_per_point)
-            
+
             self.model_x.fit(X, y_x)
             self.model_y.fit(X, y_y)
             self.is_calibrated = True
@@ -92,7 +92,7 @@ class GazeBuffer:
     안정적인 결과를 얻기 위하여 이전 프레임 시선 데이터와의 연계
     buffer_size: 몇 프레임 전까지 저장하여 평균을 낼 것인가를 정함
     """
-    def __init__(self, buffer_size=3):
+    def __init__(self, buffer_size=5):
         self.buffer = []
         self.buffer_size = buffer_size
 
@@ -186,18 +186,29 @@ def correct_gaze_vector(gaze_vector, head_rotation):
     return corrected_gaze
 ##############################################################################################################################################
 
-### 노이즈 필터링 ###
-def filter_sudden_changes(new_gaze, prev_gaze, max_change=30):
-    """
-    VV
-    max_change: 시선 데이터가 이전 프레임과 비교하여 한 프레임에서 다음 프레임으로 얼마나 많이 변화할 수 있는지를 제한하는 최대 허용 변화량
-    """
+def filter_sudden_changes(new_gaze, prev_gaze, max_change_x=50, max_change_y=25):
     if prev_gaze is None:
         return new_gaze
-    change = np.linalg.norm(new_gaze - prev_gaze)
-    if change > max_change:
-        return prev_gaze + (new_gaze - prev_gaze) * (max_change / change)
+    change_x = abs(new_gaze[0] - prev_gaze[0])
+    change_y = abs(new_gaze[1] - prev_gaze[1])
+    if change_x > max_change_x:
+        new_gaze[0] = prev_gaze[0] + (new_gaze[0] - prev_gaze[0]) * (max_change_x / change_x)
+    if change_y > max_change_y:
+        new_gaze[1] = prev_gaze[1] + (new_gaze[1] - prev_gaze[1]) * (max_change_y / change_y)
     return new_gaze
+
+# ### 노이즈 필터링 ###
+# def filter_sudden_changes(new_gaze, prev_gaze, max_change=30):
+#     """
+#     VV
+#     max_change: 시선 데이터가 이전 프레임과 비교하여 한 프레임에서 다음 프레임으로 얼마나 많이 변화할 수 있는지를 제한하는 최대 허용 변화량
+#     """
+#     if prev_gaze is None:
+#         return new_gaze
+#     change = np.linalg.norm(new_gaze - prev_gaze)
+#     if change > max_change:
+#         return prev_gaze + (new_gaze - prev_gaze) * (max_change / change)
+#     return new_gaze
 
 def draw_point(image, point, color=(0, 255, 0)):
     cv2.circle(image, (int(point[0]), int(point[1])), 5, color, -1)
@@ -206,6 +217,7 @@ def limit_gaze_to_screen(gaze_point_x, gaze_point_y, screen_width, screen_height
     gaze_point_x = min(max(gaze_point_x, 0), screen_width - 1)
     gaze_point_y = min(max(gaze_point_y, 0), screen_height - 1)
     return gaze_point_x, gaze_point_y
+
 
 ############################################################ main code ############################################################
 
@@ -334,10 +346,12 @@ while cap.isOpened():
                     if calibration.is_calibrated:
                         normalized_gaze = calibration.transform_gaze(filtered_gaze)
                         if normalized_gaze is not None:
+                            # ### 좌우반전 ###
+                            # screen_x = int((1 - (normalized_gaze[0] + 1) / 2) * w)
                             screen_x = int((normalized_gaze[0] + 1) * w / 2)
                             screen_y = int((-normalized_gaze[1] + 1) * h / 2)
                             screen_x, screen_y = limit_gaze_to_screen(screen_x, screen_y, w, h)
-                            screen_x, screen_y = int(screen_x * 0.8), int(screen_y * 0.8)
+                            screen_x, screen_y = int(screen_x), int(screen_y)
                             
                             draw_point(image, (screen_x, screen_y), (255, 255, 0))
                             print(f"Calibrated gaze point: ({screen_x}, {screen_y})")
