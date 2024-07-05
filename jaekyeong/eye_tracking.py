@@ -114,7 +114,7 @@ class GazeFixation:
     duration: 시선이 고정된 상태로 인식되기 위해 요구되는 최소 지속 시간
     window_size: 이전 프레임과의 연계 (프레임 개수)
     """
-    def init(self, velocity_threshold=0.1, duration=0.4, window_size=3):
+    def __init__(self, velocity_threshold=0.1, duration=0.4, window_size=5):
         self.velocity_threshold = velocity_threshold
         self.duration = duration
         self.window_size = window_size
@@ -199,6 +199,8 @@ def filter_sudden_changes(new_gaze, prev_gaze, max_change=30):
         return prev_gaze + (new_gaze - prev_gaze) * (max_change / change)
     return new_gaze
 
+def draw_point(image, point, color=(0, 255, 0)):
+    cv2.circle(image, (int(point[0]), int(point[1])), 5, color, -1)
 ### 시선을 화면 안쪽으로 제한 ###
 def limit_gaze_to_screen(gaze_point_x, gaze_point_y, screen_width, screen_height):
     gaze_point_x = min(max(gaze_point_x, 0), screen_width - 1)
@@ -335,12 +337,14 @@ while cap.isOpened():
                             screen_x = int((normalized_gaze[0] + 1) * w / 2)
                             screen_y = int((-normalized_gaze[1] + 1) * h / 2)
                             screen_x, screen_y = limit_gaze_to_screen(screen_x, screen_y, w, h)
-                            screen_x, screen_y = screen_x * 2, screen_y * 0.8
+                            screen_x, screen_y = int(screen_x * 0.8), int(screen_y * 0.8)
                             
-                            cv2.circle(image, (int(screen_x), int(screen_y)), 5, (255, 255, 0), -1)
+                            draw_point(image, (screen_x, screen_y), (255, 255, 0))
                             print(f"Calibrated gaze point: ({screen_x}, {screen_y})")
 
                             is_fixed = gaze_fixation.update((screen_x, screen_y))
+                            if is_fixed:
+                                print("Gaze is fixed")
             else:
                 print(f"얼굴인식 불가")
 
