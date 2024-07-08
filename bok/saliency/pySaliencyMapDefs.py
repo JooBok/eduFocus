@@ -1,10 +1,10 @@
-# Gunner Farneback의 알고리즘을 사용하여 광류(optical flows)를 계산하기 위한 파라미터
-farne_pyr_scale = 0.5    # 피라미드 스케일
-farne_levels = 3         # 피라미드 레벨 수
-farne_winsize = 15       # 윈도우 크기
-farne_iterations = 3     # 각 피라미드 레벨에서의 반복 횟수
-farne_poly_n = 5         # 픽셀 이웃 크기
-farne_poly_sigma = 1.2   # 가우시안 필터의 표준 편차
+# Gunnar Farneback의 알고리즘을 사용하여 광류(optical flows)를 계산하기 위한 파라미터
+farne_pyr_scale = 0.5    # 피라미드 스케일(낮을수록 더 자세한 정보를 캡쳐)
+farne_levels = 3         # 피라미드 레벨 수(높을수록 더 많은 레벨에서 계산)
+farne_winsize = 15       # 윈도우 크기(커질수록 더 많은 주변 픽셀 고려)
+farne_iterations = 3     # 각 피라미드 레벨에서의 반복 횟수(많을수록 정확도가 높아짐)
+farne_poly_n = 5         # 픽셀 이웃 크기(커질수록 더 많은 주변 필셀 고려)
+farne_poly_sigma = 1.2   # 가우시안 필터의 표준 편차(다항식 근사화에 사용되는 가우시안 필터의 표준 편차 결정)
 farne_flags = 0          # 알고리즘 플래그
 
 # 지역 최대값을 탐지하기 위한 파라미터
