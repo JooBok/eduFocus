@@ -55,7 +55,7 @@ class GazeFixation:
     duration: 시선이 고정된 상태로 인식되기 위해 요구되는 최소 지속 시간
     window_size: 이전 프레임과의 연계 (프레임 개수)
     """
-    def __init__(self, velocity_threshold=0.1, duration=0.2, window_size=5):
+    def __init__(self, velocity_threshold=0.1, duration=0.2, window_size=6):
         self.velocity_threshold = velocity_threshold
         self.duration = duration
         self.window_size = window_size
