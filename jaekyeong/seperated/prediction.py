@@ -9,7 +9,11 @@ from scipy.spatial.transform import Rotation
 import joblib
 
 mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(refine_landmarks=True, min_detection_confidence=0.5, min_tracking_confidence=0.5)
+face_mesh = mp_face_mesh.FaceMesh(
+    refine_landmarks=True, 
+    min_detection_confidence=0.7, 
+    min_tracking_confidence=0.7
+    )
 mp_drawing = mp.solutions.drawing_utils
 
 cap = cv2.VideoCapture(0)
@@ -29,7 +33,7 @@ class GazeBuffer:
     안정적인 결과를 얻기 위하여 이전 프레임 시선 데이터와의 연계
     buffer_size: 몇 프레임 전까지 저장하여 평균을 낼 것인가를 정함
     """
-    def __init__(self, buffer_size=5):
+    def __init__(self, buffer_size=6):
         self.buffer = []
         self.buffer_size = buffer_size
 
@@ -51,7 +55,7 @@ class GazeFixation:
     duration: 시선이 고정된 상태로 인식되기 위해 요구되는 최소 지속 시간
     window_size: 이전 프레임과의 연계 (프레임 개수)
     """
-    def __init__(self, velocity_threshold=0.2, duration=0.3, window_size=5):
+    def __init__(self, velocity_threshold=0.1, duration=0.2, window_size=5):
         self.velocity_threshold = velocity_threshold
         self.duration = duration
         self.window_size = window_size
@@ -113,7 +117,7 @@ def correct_gaze_vector(gaze_vector, head_rotation):
     corrected_gaze = np.dot(head_rotation, gaze_vector)
     return corrected_gaze
 
-def filter_sudden_changes(new_gaze, prev_gaze, max_change_x=30, max_change_y=15):
+def filter_sudden_changes(new_gaze, prev_gaze, max_change_x=10, max_change_y=10):
     if prev_gaze is None:
         return new_gaze
     change_x = abs(new_gaze[0] - prev_gaze[0])
@@ -151,10 +155,10 @@ while cap.isOpened():
                 mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=1, circle_radius=1),
                 mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=1))
 
-            left_iris = np.mean([[lm.x, lm.y, lm.z] for lm in face_landmarks.landmark[468:474]], axis=0)[:3]
-            right_iris = np.mean([[lm.x, lm.y, lm.z] for lm in face_landmarks.landmark[473:479]], axis=0)[:3]
-            left_eye = np.mean([[lm.x, lm.y, lm.z] for lm in face_landmarks.landmark[33:42]], axis=0)[:3]
-            right_eye = np.mean([[lm.x, lm.y, lm.z] for lm in face_landmarks.landmark[263:272]], axis=0)[:3]
+            left_iris = get_center(face_landmarks.landmark[468:474])[:3]
+            right_iris = get_center(face_landmarks.landmark[473:479])[:3]
+            left_eye = get_center(face_landmarks.landmark[33:42])[:3]
+            right_eye = get_center(face_landmarks.landmark[263:272])[:3]
 
             estimated_distance = calculate_distance([left_iris, right_iris], image.shape[0])
 
@@ -167,28 +171,36 @@ while cap.isOpened():
             right_gaze_corrected = correct_gaze_vector(right_gaze, head_rotation)
 
             combined_gaze = calculate_combined_gaze(left_gaze_corrected, right_gaze_corrected)
-            gaze_buffer.add(combined_gaze)
+
+            gaze_x = model_x.predict([combined_gaze])[0]
+            gaze_y = model_y.predict([combined_gaze])[0]
+            
+            gaze_buffer.add(np.array([gaze_x, gaze_y]))
             smoothed_gaze = gaze_buffer.get_average()
 
             ### 노이즈 필터링 ###
-            filtered_gaze = filter_sudden_changes(smoothed_gaze, prev_gaze)
+            filtered_gaze = filter_sudden_changes(
+                new_gaze = smoothed_gaze, 
+                prev_gaze = prev_gaze,
+                max_change_x = 20,
+                max_change_y = 10
+                )
+            gaze_x, gaze_y = filtered_gaze
             prev_gaze = filtered_gaze
 
-            gaze_x = model_x.predict([filtered_gaze])[0]
-            gaze_y = model_y.predict([filtered_gaze])[0]
-
             screen_x = int((gaze_x + 1) * w / 2)
-            screen_y = int((-gaze_y + 1) * h / 2)
+            screen_y = int((1 - gaze_y) * h / 2)
+
             screen_x, screen_y = limit_gaze_to_screen(screen_x, screen_y, w, h)
             screen_x, screen_y = int(screen_x), int(screen_y)
-            
-            cv2.circle(image, (screen_x, screen_y), 10, (255, 0, 0), -1)
+
+            cv2.circle(image, (screen_x, screen_y), 10, (0, 255, 0), -1)
             print(f"Calibrated gaze point: ({screen_x}, {screen_y})")           
             
             is_fixed = gaze_fixation.update((screen_x, screen_y))
 
     cv2.imshow('MediaPipe Iris Gaze Tracking', image)
-    if cv2.waitKey(1) & 0xFF == 27:
+    if cv2.waitKey(20) & 0xFF == 27:
         break
 
 cap.release()
