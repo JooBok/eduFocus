@@ -9,9 +9,9 @@ import joblib
 
 ### 테스트용 모델을 만들기 위한 코드입니다.
 ### 코드 실행시 웹캠 화면이 생성되며 키를 입력하여 데이터를 저장합니다(1프레임씩)
-### q: 좌상단, e: 우상단, s: 중앙, z: 좌하단, c: 우하단
+### q: 좌상단, w: 중상단, e: 우상단, a: 우중단, s: 중앙, d: 좌중단, z: 좌하단, x: 중하단, c: 우하단
 ### 데이터 수집이 종료된 후에는 g 키를 입력하여 모델을 훈련시키고 저장시켜 주세요.
-### g 키 입력 후 테스트 화면은 임시입니다. 정확한 시선추적을 원하시면 동일 경로에 있는 predict.py를 실행하세요. (g 키 입력시 저장되는 모델을 자동으로 사용합니다.)
+### g 키 입력 후 테스트 화면은 임시입니다. 정확한 시선추적을 원하시면 동일 경로에 있는 prediction.py를 실행하세요. (g 키 입력시 저장되는 모델을 자동으로 사용합니다.)
 
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
@@ -31,12 +31,17 @@ cv2.resizeWindow('MediaPipe Iris Gaze Calibration', 1280, 720)
 class GazeCalibration:
     def __init__(self, degree=3, alpha=0.7):
         self.calibration_points = {
-            'q': (-1, 1),   # 좌상단
-            'e': (1, 1),    # 우상단
-            's': (0, 0),    # 중앙
-            'z': (-1, -1),  # 좌하단
-            'c': (1, -1)    # 우하단
+            'q': (-1, 1),    # 좌상단
+            'w': (0, 1),     # 중앙 상단
+            'e': (1, 1),     # 우상단
+            'a': (-1, 0),    # 좌중단
+            's': (0, 0),     # 중앙
+            'd': (1, 0),     # 우중단
+            'z': (-1, -1),   # 좌하단
+            'x': (0, -1),    # 중앙 하단
+            'c': (1, -1)     # 우하단
         }
+
         self.collected_data = {key: [] for key in self.calibration_points}
         self.model_x = make_pipeline(
             StandardScaler(),
@@ -162,18 +167,18 @@ while cap.isOpened():
 
 ########################################################################################## 텍스트 ##########################################################################################
     if not calibration.is_calibrated:
-        cv2.putText(image, "Press Q, E, S, Z, C to collect data for calibration", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.putText(image, "Press Q, W, E, A, S, D, Z, X, C to collect data for calibration", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         cv2.putText(image, "Q E = Top(L, R), S = middle, Z C = bottom(L, R)", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         cv2.putText(image, "Press G to train and save the model", (10, 90), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
     else:
-        cv2.putText(image, "Calibration complete. Tracking gaze...", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+        cv2.putText(image, "Calibration complete. press ESC and run prediction.py", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
     cv2.putText(image, "Press ESC to exit", (10, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
     cv2.imshow('MediaPipe Iris Gaze Calibration', image)
     
     key = cv2.waitKey(1)
-    if key & 0xFF in [ord('q'), ord('e'), ord('s'), ord('z'), ord('c')]:
+    if key & 0xFF in [ord('q'), ord('w'), ord('e'), ord('a'), ord('s'), ord('d'), ord('z'), ord('x'), ord('c')]:
         calibration.collect_data(combined_gaze, chr(key & 0xFF))
         print(f"Collected data for point {chr(key & 0xFF)}")
 
