@@ -9,10 +9,11 @@ from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 from sklearn.pipeline import make_pipeline
 from sklearn.linear_model import Ridge
 from scipy.spatial.transform import Rotation
+from sklearn.linear_model import LinearRegression
 import joblib
 
 mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(refine_landmarks=True, min_detection_confidence=0.5, min_tracking_confidence=0.5)
+face_mesh = mp_face_mesh.FaceMesh(refine_landmarks=True, min_detection_confidence=0.7, min_tracking_confidence=0.7)
 mp_drawing = mp.solutions.drawing_utils
 
 cap = cv2.VideoCapture(0)
@@ -23,7 +24,7 @@ cv2.namedWindow('MediaPipe Iris Gaze Calibration', cv2.WINDOW_NORMAL)
 cv2.resizeWindow('MediaPipe Iris Gaze Calibration', 1280, 720)
 
 class GazeCalibration:
-    def __init__(self, degree=2, alpha=0.7):
+    def __init__(self, degree=2, alpha=0.75):
         self.calibration_points = [
             (0, 0),     # 중앙
             (-1, 1),    # 왼쪽 상단
@@ -32,6 +33,7 @@ class GazeCalibration:
             (-1, -1)    # 왼쪽 하단
         ]
         self.collected_data = []
+
         self.model_x = make_pipeline(
             StandardScaler(),
             PolynomialFeatures(degree, include_bias=False),
@@ -42,7 +44,11 @@ class GazeCalibration:
             PolynomialFeatures(degree, include_bias=False),
             Ridge(alpha=alpha)
         )
-        self.samples_per_point = 3
+
+        # self.model_x = LinearRegression()
+        # self.model_y = LinearRegression()     
+           
+        self.samples_per_point = 5
         self.current_samples = 0
         self.is_calibrated = False
 
