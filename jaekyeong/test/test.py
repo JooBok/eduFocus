@@ -18,8 +18,8 @@ import joblib
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
     refine_landmarks=True,
-    min_detection_confidence=0.7,
-    min_tracking_confidence=0.7
+    min_detection_confidence=0.7, # 
+    min_tracking_confidence=0.7   # 
 )
 mp_drawing = mp.solutions.drawing_utils
 
@@ -132,7 +132,8 @@ while cap.isOpened():
     success, image = cap.read()
     if not success:
         break
-
+    
+    image = cv2.flip(image, 1)
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     results = face_mesh.process(image_rgb)
 
