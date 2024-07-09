@@ -3,3 +3,5 @@ mediapipe
 scikit-learn
 scipy
 numpy
+kafka-python
+asyncio
