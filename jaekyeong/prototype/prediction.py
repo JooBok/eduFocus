@@ -215,16 +215,13 @@ while cap.isOpened():
 
                 temp_data = dict()
                 temp_data[frame] = [screen_x, screen_y]
-
+                print(temp_data)
     
     cv2.imshow('MediaPipe Iris Gaze Prediction', image)
 
     ### ESC 키 입력 종료 ###
     if cv2.waitKey(1) & 0xFF == 27:
         break
-
-with open(temp_data.json, 'r') as f:
-    json.dump(temp_data, f)
 
 cap.release()
 cv2.destroyAllWindows()
