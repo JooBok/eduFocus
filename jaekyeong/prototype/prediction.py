@@ -137,6 +137,7 @@ gaze_sequence = []
 sequence_length = 10
 prev_gaze = None    
 frame = 0
+temp_data = dict()
 
 while cap.isOpened():
     success, image = cap.read()
@@ -210,10 +211,9 @@ while cap.isOpened():
 
                 ### Fixation ###
                 is_fixed = gaze_fixation.update((screen_x, screen_y))
-                
+            
                 frame += 1
 
-                temp_data = dict()
                 temp_data[frame] = [screen_x, screen_y]
                 print(temp_data)
     
@@ -222,6 +222,35 @@ while cap.isOpened():
     ### ESC 키 입력 종료 ###
     if cv2.waitKey(1) & 0xFF == 27:
         break
+########################################################################
+saliency_map = None
+
+def calc(temp_data, saliency_map):
+    count = 0
+    
+    for _ in range(len(saliency_map)):
+        x, y = temp_data[_]
+
+        if saliency_map[y][x] > 0.7:
+            count += 1
+        else:
+            pass
+    res = count / len(saliency_map)
+    return res
+
+########################################################################
+# extract
+########################################################################
+result = calc(temp_data, saliency_map)
+
+print(result)
+########################################################################
+# aggregator_url = "http://result-aggregator-service/aggregate"
+
+# import requests
+# requests.post(aggregator_url, json=result)
+########################################################################
+
 
 cap.release()
 cv2.destroyAllWindows()
