@@ -33,7 +33,7 @@ class GazeBuffer:
     안정적인 결과를 얻기 위하여 이전 프레임 시선 데이터와의 연계
     buffer_size: 몇 프레임 전까지 저장하여 평균을 낼 것인가를 정함
     """
-    def __init__(self, buffer_size=6):
+    def __init__(self, buffer_size=4):
         self.buffer = []
         self.buffer_size = buffer_size
 
@@ -182,7 +182,7 @@ while cap.isOpened():
             filtered_gaze = filter_sudden_changes(
                 new_gaze = smoothed_gaze, 
                 prev_gaze = prev_gaze,
-                max_change_x = 20,
+                max_change_x = 10,
                 max_change_y = 10
                 )
             gaze_x, gaze_y = filtered_gaze

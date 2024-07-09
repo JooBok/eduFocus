@@ -8,7 +8,7 @@ from scipy.spatial.transform import Rotation
 import joblib
 
 ### 테스트용 모델을 만들기 위한 코드입니다.
-### 코드 실행시 웹캠 화면이 생성되며 키를 입력하여 데이터를 저장합니다(1프레임씩)
+### 코드 실행시 웹캠 화면이 생성되며 키를 입력하여 이미지 데이터를 저장합니다(1프레임씩)
 ### q: 좌상단, w: 중상단, e: 우상단, a: 우중단, s: 중앙, d: 좌중단, z: 좌하단, x: 중하단, c: 우하단
 ### 데이터 수집이 종료된 후에는 g 키를 입력하여 모델을 훈련시키고 저장시켜 주세요.
 ### g 키 입력 후 테스트 화면은 임시입니다. 정확한 시선추적을 원하시면 동일 경로에 있는 prediction.py를 실행하세요. (g 키 입력시 저장되는 모델을 자동으로 사용합니다.)
@@ -29,7 +29,7 @@ cv2.namedWindow('MediaPipe Iris Gaze Calibration', cv2.WINDOW_NORMAL)
 cv2.resizeWindow('MediaPipe Iris Gaze Calibration', 1280, 720)
 
 class GazeCalibration:
-    def __init__(self, degree=3, alpha=0.7):
+    def __init__(self, degree=2, alpha=0.7):
         self.calibration_points = {
             'q': (-1, 1),    # 좌상단
             'w': (0, 1),     # 중앙 상단
