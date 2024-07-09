@@ -8,6 +8,8 @@ from scipy.spatial.transform import Rotation
 
 import joblib
 
+### 변경 가능한 변수들은 ctrl + f 에 $를 입력하시면 찾으실 수 있습니다.
+
 ### 범용성있는 기초 모델을 만들기 위한 코드입니다.
 ### 코드 실행시 웹캠 화면이 생성되며 키를 입력하여 데이터를 저장(모델 훈련용) 합니다.
 ### q,w,e
@@ -18,12 +20,13 @@ import joblib
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
     refine_landmarks=True,
-    min_detection_confidence=0.7, # 
-    min_tracking_confidence=0.7   # 
+    min_detection_confidence=0.7, ### $ 최소 탐지 신뢰값 ###
+    min_tracking_confidence=0.7   ### $ 최소 추적 신뢰값 ###
 )
 mp_drawing = mp.solutions.drawing_utils
 
 cap = cv2.VideoCapture(0)
+### $ 해상도 ###
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
@@ -38,6 +41,7 @@ class GazeCalibration:
             'z': (-1, -1), 'x': (0, -1), 'c': (1, -1)
         }
         self.collected_data = {key: [] for key in self.calibration_points}
+        ### $ RF regressor 하이퍼 패러미터 ###
         self.model_x = RandomForestRegressor(n_estimators = 100, random_state = 777)
         self.model_y = RandomForestRegressor(n_estimators = 100, random_state = 777)
         self.is_calibrated = False
@@ -46,6 +50,7 @@ class GazeCalibration:
     def collect_data(self, gaze_point, key):
         self.collected_data[key].append(gaze_point)
     
+    ### $ 데이터 증강 ###
     def augment_data(self, X, y, num_augmented = 1000):
         augmented_X, augmented_y = [], []
         for _ in range(num_augmented):
@@ -67,8 +72,10 @@ class GazeCalibration:
     def train_and_save_model(self):
         X, y = self.prepare_sequence(self.collected_data)
         if len(X) > 0:
-            X = X.reshape(X.shape[0], -1)  # Flatten the sequence
-            X, y = self.augment_data(X, y)  # 데이터 증강
+            ### Flatten ###
+            X = X.reshape(X.shape[0], -1)
+            ### Data 증강 ###
+            X, y = self.augment_data(X, y)
             X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
             self.model_x.fit(X_train, y_train[:, 0])
@@ -76,17 +83,20 @@ class GazeCalibration:
 
             x_score = self.model_x.score(X_test, y_test[:, 0])
             y_score = self.model_y.score(X_test, y_test[:, 1])
-            print(f"Model X R² score: {x_score:.4f}")
-            print(f"Model Y R² score: {y_score:.4f}")
+            print(f"=====================================\n모델 X의 R² score: {x_score:.4f}\n=====================================")
+            print(f"=====================================\n모델 Y의 R² score: {y_score:.4f}\n=====================================")
 
             joblib.dump(self.model_x, 'model_x.pkl')
             joblib.dump(self.model_y, 'model_y.pkl')
-            print("Calibration models saved")
+            print("Calibration models saved!!!!!!!!!!")
             self.is_calibrated = True
         else:
-            print("Not enough data to train the model")
+            print("ERROR | Not enough data to train the model")
 
     def predict(self, gaze_sequence):
+        """
+        RF regressor 사용하여 calculate_combined_gaze 함수로 계산한 좌표를 실제 시선 좌표로 predict.
+        """
         if self.is_calibrated:
             gaze_sequence = np.array(gaze_sequence).flatten().reshape(1, -1)
             x = self.model_x.predict(gaze_sequence)[0]
@@ -95,20 +105,24 @@ class GazeCalibration:
         else:
             return None
 
+### 유클리드거리로 화면과 사용자 상대적 거리 계산 ###
 def calculate_distance(iris_landmarks, image_height):
     left_iris, right_iris = iris_landmarks
     distance = np.linalg.norm(np.array(left_iris) - np.array(right_iris))
     estimated_distance = (1 / distance) * image_height
     return estimated_distance
 
+### 3차원으로 눈과 홍채 중심 계산(평균) ###
 def get_center(landmarks):
     return np.mean([[lm.x, lm.y, lm.z] for lm in landmarks], axis=0)
 
+### 홍채이동 벡터 * calculate_distance -> 시선 이동 거리 ###
 def estimate_gaze(eye_center, iris_center, estimated_distance):
     eye_vector = iris_center - eye_center
     gaze_point = eye_center + eye_vector * estimated_distance
     return gaze_point
 
+### 머리 회전 추적 ###
 def estimate_head_pose(face_landmarks):
     nose = np.array([face_landmarks.landmark[1].x, face_landmarks.landmark[1].y, face_landmarks.landmark[1].z])
     left_eye = np.array([face_landmarks.landmark[33].x, face_landmarks.landmark[33].y, face_landmarks.landmark[33].z])
@@ -118,10 +132,12 @@ def estimate_head_pose(face_landmarks):
     rotation_matrix = Rotation.align_vectors([[0, 0, -1]], [face_normal])[0].as_matrix()
     return rotation_matrix
 
+### 머리 회전과 시선 벡터 추적 ###
 def correct_gaze_vector(gaze_vector, head_rotation):
     corrected_gaze = np.dot(head_rotation, gaze_vector)
     return corrected_gaze
 
+### 왼쪽시선과 오른쪽시선 결합 (평균) ###
 def calculate_combined_gaze(left_gaze, right_gaze):
     return (left_gaze + right_gaze) / 2
 
@@ -176,7 +192,7 @@ while cap.isOpened():
                     screen_y = int((1 - y) * h / 2)
                     cv2.circle(image, (screen_x, screen_y), 10, (0, 255, 0), -1)
 
-    # 화면에 항상 calibration_points 좌표에 원을 표시
+    ### 화면에 점 표시 코드 ###
     for point, (px, py) in calibration.calibration_points.items():
         screen_x = int((px + 1) * w / 2)
         screen_y = int((1 - py) * h / 2)
@@ -184,7 +200,7 @@ while cap.isOpened():
         cv2.putText(image, point, (screen_x - 20, screen_y - 20), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
 
 
-########################################################################################## 텍스트 ##########################################################################################
+########################################################################### 텍스트 ###########################################################################
     if not calibration.is_calibrated:
         cv2.putText(image, "Press Q, W, E, A, S, D, Z, X, C to collect data for calibration", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
         cv2.putText(image, "Q E = Top(L, R), S = middle, Z C = bottom(L, R)", (10, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
@@ -195,8 +211,11 @@ while cap.isOpened():
     cv2.putText(image, "Press ESC to exit", (10, h - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
 
     cv2.imshow('MediaPipe Iris Gaze Calibration', image)
-    
+##############################################################################################################################################################
+
+    ### $ waitkey조절하여 프레임 조절 가능 ###
     key = cv2.waitKey(1)
+
     if key & 0xFF in [ord('q'), ord('w'), ord('e'), ord('a'), ord('s'), ord('d'), ord('z'), ord('x'), ord('c')]:
         if len(gaze_sequence) == calibration.sequence_length:
             calibration.collect_data(combined_gaze, chr(key & 0xFF))
@@ -205,7 +224,8 @@ while cap.isOpened():
     if key & 0xFF == ord('g') and not calibration.is_calibrated:
         calibration.train_and_save_model()
 
-    if key & 0xFF == 27:  # ESC 키를 누르면 종료
+    ### ESC 키 입력 종료 ###
+    if key & 0xFF == 27:  
         break
 
 cap.release()
