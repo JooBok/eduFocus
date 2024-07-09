@@ -5,7 +5,9 @@ import joblib
 from scipy.spatial.transform import Rotation
 import time
 
-# MediaPipe 초기화
+### 변경 가능한 변수들은 ctrl + f 에 $를 입력하시면 찾으실 수 있습니다.
+### RF_reg_calibrate.py에서 저장한 모델을 사용하여 시선 예측하는 파일입니다.
+
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
     refine_landmarks=True,
@@ -14,21 +16,19 @@ face_mesh = mp_face_mesh.FaceMesh(
 )
 mp_drawing = mp.solutions.drawing_utils
 
-# 웹캠 설정
 cap = cv2.VideoCapture(0)
 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
-# 저장된 모델 불러오기
+### 모델 Load ###
 model_x = joblib.load('model_x.pkl')
 model_y = joblib.load('model_y.pkl')
 
 ### 시선 데이터 평활화 ###
 class GazeBuffer:
     """
-    VV
     안정적인 결과를 얻기 위하여 이전 프레임 시선 데이터와의 연계
-    buffer_size: 몇 프레임 전까지 저장하여 평균을 낼 것인가를 정함
+    $ buffer_size: 몇 프레임 전까지 저장하여 평균을 낼 것인가를 정함
     """
     def __init__(self, buffer_size=4):
         self.buffer = []
@@ -46,11 +46,10 @@ class GazeBuffer:
 
 class GazeFixation:
     """
-    VV
     시선좌표와 시간데이터를 저장하여 속도를 측정하여 fixation 설정
-    velocity_threshold: 평균 속도가 이 값보다 낮을 때, 시선이 고정된 것으로 간주 (픽셀/s)
-    duration: 시선이 고정된 상태로 인식되기 위해 요구되는 최소 지속 시간
-    window_size: 이전 프레임과의 연계 (프레임 개수)
+    $ velocity_threshold: 평균 속도가 이 값보다 낮을 때, 시선이 고정된 것으로 간주 (픽셀/s)
+    $ duration: 시선이 고정된 상태로 인식되기 위해 요구되는 최소 지속 시간
+    $ window_size: 이전 프레임과의 연계 (프레임 개수)
     """
     def __init__(self, velocity_threshold=0.1, duration=0.2, window_size=6):
         self.velocity_threshold = velocity_threshold
@@ -84,7 +83,6 @@ class GazeFixation:
             self.start_time = None
         return False 
 
-# 필요한 함수들 (원본 코드에서 가져옴)
 def calculate_distance(iris_landmarks, image_height):
     left_iris, right_iris = iris_landmarks
     distance = np.linalg.norm(np.array(left_iris) - np.array(right_iris))
@@ -112,6 +110,7 @@ def correct_gaze_vector(gaze_vector, head_rotation):
     corrected_gaze = np.dot(head_rotation, gaze_vector)
     return corrected_gaze
 
+### $ 프레임당 시선좌표 이동속도 제한 ###
 def filter_sudden_changes(new_gaze, prev_gaze, max_change_x=10, max_change_y=10):
     if prev_gaze is None:
         return new_gaze
@@ -123,16 +122,16 @@ def filter_sudden_changes(new_gaze, prev_gaze, max_change_x=10, max_change_y=10)
         new_gaze[1] = prev_gaze[1] + (new_gaze[1] - prev_gaze[1]) * (max_change_y / change_y)
     return new_gaze
 
+### 시선이 화면 밖으로 나가지 않도록 제한하는 함수 ###
 def limit_gaze_to_screen(gaze_point_x, gaze_point_y, screen_width, screen_height):
     gaze_point_x = min(max(gaze_point_x, 0), screen_width - 1)
     gaze_point_y = min(max(gaze_point_y, 0), screen_height - 1)
     return gaze_point_x, gaze_point_y
 
-# 실험 루프
 gaze_buffer = GazeBuffer()
 gaze_fixation = GazeFixation()
 gaze_sequence = []
-sequence_length = 10  # 원본 코드의 sequence_length와 동일하게 설정
+sequence_length = 10
 prev_gaze = None    
 
 while cap.isOpened():
@@ -176,10 +175,13 @@ while cap.isOpened():
                 gaze_sequence.pop(0)
 
             if len(gaze_sequence) == sequence_length:
+                ### flatten ###
                 gaze_input = np.array(gaze_sequence).flatten().reshape(1, -1)
+                ### 모델 예측 ###
                 predicted_x = model_x.predict(gaze_input)[0]
                 predicted_y = model_y.predict(gaze_input)[0]
 
+                ### 평활화 ###
                 gaze_buffer.add(np.array([predicted_x, predicted_y]))
                 smoothed_gaze = gaze_buffer.get_average()
 
@@ -192,6 +194,7 @@ while cap.isOpened():
                     )
 
                 predicted_x, predicted_y = filtered_gaze
+                ### previous gaze 갱신 ###
                 prev_gaze = filtered_gaze
 
                 screen_x = int((predicted_x + 1) * w / 2)
@@ -203,11 +206,13 @@ while cap.isOpened():
                 cv2.circle(image, (screen_x, screen_y), 10, (0, 255, 0), -1)
                 print(f"Calibrated gaze point: ({screen_x}, {screen_y})")    
 
+                ### Fixation ###
                 is_fixed = gaze_fixation.update((screen_x, screen_y))
 
     cv2.imshow('MediaPipe Iris Gaze Prediction', image)
-    
-    if cv2.waitKey(1) & 0xFF == 27:  # ESC 키를 누르면 종료
+
+    ### ESC 키 입력 종료 ###
+    if cv2.waitKey(1) & 0xFF == 27:
         break
 
 cap.release()
