@@ -30,7 +30,7 @@ class GazeBuffer:
     안정적인 결과를 얻기 위하여 이전 프레임 시선 데이터와의 연계
     $ buffer_size: 몇 프레임 전까지 저장하여 평균을 낼 것인가를 정함
     """
-    def __init__(self, buffer_size=4):
+    def __init__(self, buffer_size=3):
         self.buffer = []
         self.buffer_size = buffer_size
 
@@ -102,8 +102,11 @@ def estimate_head_pose(face_landmarks):
     left_eye = np.array([face_landmarks.landmark[33].x, face_landmarks.landmark[33].y, face_landmarks.landmark[33].z])
     right_eye = np.array([face_landmarks.landmark[263].x, face_landmarks.landmark[263].y, face_landmarks.landmark[263].z])
     face_normal = np.cross(right_eye - nose, left_eye - nose)
-    face_normal /= np.linalg.norm(face_normal)
-    rotation_matrix = Rotation.align_vectors([[0, 0, -1]], [face_normal])[0].as_matrix()
+    if np.linalg.norm(face_normal) > 1e-6:
+        face_normal = face_normal / np.linalg.norm(face_normal)
+        rotation_matrix = Rotation.align_vectors([[0, 0, -1]], [face_normal])[0].as_matrix()
+    else:
+        rotation_matrix = np.eye(3) 
     return rotation_matrix
 
 def correct_gaze_vector(gaze_vector, head_rotation):
@@ -111,7 +114,7 @@ def correct_gaze_vector(gaze_vector, head_rotation):
     return corrected_gaze
 
 ### $ 프레임당 시선좌표 이동속도 제한 ###
-def filter_sudden_changes(new_gaze, prev_gaze, max_change_x=10, max_change_y=10):
+def filter_sudden_changes(new_gaze, prev_gaze, max_change_x=15, max_change_y=15):
     if prev_gaze is None:
         return new_gaze
     change_x = abs(new_gaze[0] - prev_gaze[0])
@@ -188,9 +191,7 @@ while cap.isOpened():
                 ### 노이즈 필터링 ###
                 filtered_gaze = filter_sudden_changes(
                     new_gaze = smoothed_gaze, 
-                    prev_gaze = prev_gaze,
-                    max_change_x = 10,
-                    max_change_y = 10
+                    prev_gaze = prev_gaze
                     )
 
                 predicted_x, predicted_y = filtered_gaze
