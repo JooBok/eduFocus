@@ -1,0 +1,30 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: classification-model
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: classification-model
+  template:
+    metadata:
+      labels:
+        app: classification-model
+    spec:
+      containers:
+      - name: classification-model
+        image: IMAGE_PLACE
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: classification-model-service
+spec:
+  selector:
+    app: classification-model
+  ports:
+    - protocol: TCP
+      port: 80
+      tagetPort: 8080

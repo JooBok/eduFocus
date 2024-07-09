@@ -1,0 +1,75 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temp-mediapipe1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: temp-mediapipe1
+  template:
+    metadata:
+      labels:
+        app: temp-mediapipe1
+    spec:
+      containers:
+        - name: temp-mediapipe1
+          image: IMAGE_PLACE1
+          env:
+          - name: KAFKA_BOOTSTRAP_SERVERS
+            value: "kafka-service:9092"
+          - name: KAFKA_INPUT_TOPIC
+            value: "kid_face_video"
+          - name: AGGREGATOR_URL
+            value: "http://result-aggregator-service/aggregate"
+---
+apiVersion: apps/v1
+kind: Deployment
+matadata:
+  name: temp-mediapipe2
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: temp-mediapipe2
+  template:
+    metadata:
+      labels:
+        app: temp-meidapipe2
+    spec:
+      containers:
+      - name: temp-mediapipe2
+        image: IMAGE_PLACE2
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka-service:9092"
+        - name: KAFKA_INPUT_TOPIC
+          value: "kid_face_video"
+        - name: AGGREGATOR_URL
+          value: "http://result-aggregator-service/aggregate"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temp-mediapipe3
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: temp-mediapipe3
+  template:
+    metadata:
+      labels:
+        app: temp-meidapipe3
+    spec:
+      containers:
+      - name: temp-mediapipe3
+        image: IMAGE_PLACE3
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka-service:9092"
+        - name: KAFKA_INPUT_TOPIC
+          value: "kid_face_video"
+        - name: AGGREGATOR_URL
+          value: "http://result-aggregator-service/aggregate"
