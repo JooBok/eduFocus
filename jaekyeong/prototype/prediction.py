@@ -4,6 +4,7 @@ import numpy as np
 import joblib
 from scipy.spatial.transform import Rotation
 import time
+import json
 
 ### 변경 가능한 변수들은 ctrl + f 에 $를 입력하시면 찾으실 수 있습니다.
 ### RF_reg_calibrate.py에서 저장한 모델을 사용하여 시선 예측하는 파일입니다.
@@ -215,7 +216,6 @@ while cap.isOpened():
                 frame += 1
 
                 temp_data[frame] = [screen_x, screen_y]
-                print(temp_data)
     
     cv2.imshow('MediaPipe Iris Gaze Prediction', image)
 
@@ -223,27 +223,32 @@ while cap.isOpened():
     if cv2.waitKey(1) & 0xFF == 27:
         break
 ########################################################################
-saliency_map = None
+#### {Mongo db} extract saliency map 교체 예정
+saliency_json = 'saliency_map.json'
 
+with open(saliency_json, 'r') as f:
+    saliency_map_list = json.load(f)
+    saliency_map = np.array(saliency_map_list)
+
+########################################################################
 def calc(temp_data, saliency_map):
     count = 0
-    
-    for _ in range(len(saliency_map)):
-        x, y = temp_data[_]
+    try:
+        for _ in range(1, len(saliency_map) + 1):
+            x, y = temp_data[_]
 
-        if saliency_map[y][x] > 0.7:
-            count += 1
-        else:
-            pass
+            if saliency_map[y][x] > 0.7:
+                count += 1
+            else:
+                pass
+    except:
+        pass
     res = count / len(saliency_map)
     return res
 
-########################################################################
-# extract
-########################################################################
 result = calc(temp_data, saliency_map)
-
-print(result)
+print(temp_data)
+print(f'++++++++++++++++++++++++++++++++++++++++++++{result}')
 ########################################################################
 # aggregator_url = "http://result-aggregator-service/aggregate"
 
