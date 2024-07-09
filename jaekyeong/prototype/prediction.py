@@ -136,6 +136,7 @@ gaze_fixation = GazeFixation()
 gaze_sequence = []
 sequence_length = 10
 prev_gaze = None    
+frame = 0
 
 while cap.isOpened():
     success, image = cap.read()
@@ -209,12 +210,21 @@ while cap.isOpened():
 
                 ### Fixation ###
                 is_fixed = gaze_fixation.update((screen_x, screen_y))
+                
+                frame += 1
 
+                temp_data = dict()
+                temp_data[frame] = [screen_x, screen_y]
+
+    
     cv2.imshow('MediaPipe Iris Gaze Prediction', image)
 
     ### ESC 키 입력 종료 ###
     if cv2.waitKey(1) & 0xFF == 27:
         break
+
+with open(temp_data.json, 'r') as f:
+    json.dump(temp_data, f)
 
 cap.release()
 cv2.destroyAllWindows()
