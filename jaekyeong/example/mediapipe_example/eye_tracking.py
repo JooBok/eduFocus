@@ -16,6 +16,7 @@ face_mesh = mp_face_mesh.FaceMesh(
     min_detection_confidence=0.7,
     min_tracking_confidence=0.7
 )
+mp_drawing = mp.solutions.drawing_utils
 
 ### 모델 로드 ###
 model_x = joblib.load('model_x.pkl')
@@ -33,7 +34,7 @@ class GazeBuffer:
     안정적인 결과를 얻기 위하여 이전 프레임 시선 데이터와의 연계
     $ buffer_size: 몇 프레임 전까지 저장하여 평균을 낼 것인가를 정함
     """
-    def __init__(self, buffer_size=4):
+    def __init__(self, buffer_size=3):
         self.buffer = []
         self.buffer_size = buffer_size
 
@@ -143,10 +144,12 @@ def process_frame(frame):
 
     results = face_mesh.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         
+    w, h = frame[:2]
+    
     if results.multi_face_landmarks:
         for face_landmarks in results.multi_face_landmarks:
             mp_drawing.draw_landmarks(
-                image, face_landmarks, mp_face_mesh.FACEMESH_TESSELATION,
+                results, face_landmarks, mp_face_mesh.FACEMESH_TESSELATION,
                 mp_drawing.DrawingSpec(color=(0, 255, 0), thickness=1, circle_radius=1),
                 mp_drawing.DrawingSpec(color=(0, 0, 255), thickness=1)
             )
@@ -156,7 +159,7 @@ def process_frame(frame):
             left_eye = get_center(face_landmarks.landmark[33:42])[:3]
             right_eye = get_center(face_landmarks.landmark[263:272])[:3]
 
-            estimated_distance = calculate_distance([left_iris, right_iris], image.shape[0])
+            estimated_distance = calculate_distance([left_iris, right_iris], results.shape[0])
 
             left_gaze = estimate_gaze(left_eye, left_iris, estimated_distance)
             right_gaze = estimate_gaze(right_eye, right_iris, estimated_distance)
