@@ -1,12 +1,14 @@
 import cv2
 import mediapipe as mp
 import numpy as np
+import pandas as pd
 
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import train_test_split
 from scipy.spatial.transform import Rotation
 
 import joblib
+import json
 
 ### 변경 가능한 변수들은 ctrl + f 에 $를 입력하시면 찾으실 수 있습니다.
 
@@ -51,7 +53,7 @@ class GazeCalibration:
         self.collected_data[key].append(gaze_point)
     
     ### $ 데이터 증강 ###
-    def augment_data(self, X, y, num_augmented = 1000):
+    def augment_data(self, X, y, num_augmented = 100):
         augmented_X, augmented_y = [], []
         for _ in range(num_augmented):
             idx = np.random.randint(0, len(X))
@@ -65,30 +67,96 @@ class GazeCalibration:
         for key, points in data.items():
             if len(points) >= self.sequence_length:
                 for i in range(len(points) - self.sequence_length + 1):
-                    X.append(points[i:i+self.sequence_length])
+                    X.append(np.array(points[i:i+self.sequence_length]).flatten())
                     y.append(self.calibration_points[key])
         return np.array(X), np.array(y)
 
+    def save_data_to_json(self, filename='gaze_data.json', data=None):
+        if data is None:
+            data = {key: [point.tolist() for point in points] for key, points in self.collected_data.items()}
+        
+        with open(filename, 'w') as f:
+            json.dump(data, f)
+        print(f"Data saved to {filename}")
+
+    def load_data_from_json(self, filename='gaze_data.json'):
+        try:
+            with open(filename, 'r') as f:
+                loaded_data = json.load(f)
+            print(f"Data loaded from {filename}")
+            return loaded_data
+        except FileNotFoundError:
+            print(f"File {filename} not found. No previous data loaded.")
+            return {}
+
+    def combine_data(self, old_data, new_data):
+        combined_data = old_data.copy()
+        for key, points in new_data.items():
+            if key in combined_data:
+                combined_data[key].extend([point.tolist() for point in points])
+            else:
+                combined_data[key] = [point.tolist() for point in points]
+        return combined_data
+
     def train_and_save_model(self):
-        X, y = self.prepare_sequence(self.collected_data)
-        if len(X) > 0:
-            ### Flatten ###
-            X = X.reshape(X.shape[0], -1)
-            ### Data 증강 ###
-            X, y = self.augment_data(X, y)
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        old_data = self.load_data_from_json()
+        
+        X_old, y_old = self.prepare_sequence(old_data)
+        X_new, y_new = self.prepare_sequence(self.collected_data)
 
-            self.model_x.fit(X_train, y_train[:, 0])
-            self.model_y.fit(X_train, y_train[:, 1])
+        X_combined = np.vstack([X_old, X_new]) if len(X_old) > 0 else X_new
+        y_combined = np.vstack([y_old, y_new]) if len(y_old) > 0 else y_new
 
-            x_score = self.model_x.score(X_test, y_test[:, 0])
-            y_score = self.model_y.score(X_test, y_test[:, 1])
-            print(f"=====================================\n모델 X의 R² score: {x_score:.4f}\n=====================================")
-            print(f"=====================================\n모델 Y의 R² score: {y_score:.4f}\n=====================================")
+        if len(X_combined) > 0:
+            X_combined, y_combined = self.augment_data(X_combined, y_combined)
+            X_train, X_test, y_train, y_test = train_test_split(X_combined, y_combined, test_size=0.2, random_state=777)
 
-            joblib.dump(self.model_x, 'model_x.pkl')
-            joblib.dump(self.model_y, 'model_y.pkl')
-            print("Calibration models saved!!!!!!!!!!")
+            new_model_x = RandomForestRegressor(n_estimators=100, random_state=777)
+            new_model_y = RandomForestRegressor(n_estimators=100, random_state=777)
+            
+            new_model_x.fit(X_train, y_train[:, 0])
+            new_model_y.fit(X_train, y_train[:, 1])
+
+            new_x_score = new_model_x.score(X_test, y_test[:, 0])
+            new_y_score = new_model_y.score(X_test, y_test[:, 1])
+            new_total_score = (new_x_score + new_y_score) / 2
+
+            print(f"New model X R² score: {new_x_score:.4f}")
+            print(f"New model Y R² score: {new_y_score:.4f}")
+
+
+            ###################################### 기존모델, 신모델 비교 ######################################
+            try:
+                old_model_x = joblib.load('model_x.pkl')
+                old_model_y = joblib.load('model_y.pkl')
+                
+                old_x_score = old_model_x.score(X_test, y_test[:, 0])
+                old_y_score = old_model_y.score(X_test, y_test[:, 1])
+                old_total_score = (old_x_score + old_y_score) / 2
+
+                print(f"Old model X R² score: {old_x_score:.4f}")
+                print(f"Old model Y R² score: {old_y_score:.4f}")
+
+                if new_total_score > old_total_score:
+                    print("New model performs better. Saving new model and combining data.")
+                    self.model_x, self.model_y = new_model_x, new_model_y
+                    joblib.dump(self.model_x, 'model_x.pkl')
+                    joblib.dump(self.model_y, 'model_y.pkl')
+                    
+                    combined_data = self.combine_data(old_data, self.collected_data)
+                    self.save_data_to_json(data=combined_data)
+                else:
+                    print("Old model performs better. Keeping old model and old data.")
+                    self.model_x, self.model_y = old_model_x, old_model_y
+                    self.save_data_to_json(data=old_data)
+            except FileNotFoundError:
+                print("No existing model found. Saving new model and new data.")
+                self.model_x, self.model_y = new_model_x, new_model_y
+                joblib.dump(self.model_x, 'model_x.pkl')
+                joblib.dump(self.model_y, 'model_y.pkl')
+
+                self.save_data_to_json()
+
             self.is_calibrated = True
         else:
             print("ERROR | Not enough data to train the model")
