@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: result-aggregator
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: result-aggregator
+  template:
+    metadata:
+      labels:
+        app: result-aggregator
+    spec:
+      containers:
+      - name: result-aggregator
+        image: IMAGE_PLACE
+        env:
+        - name: CLASSIFICATION_MODEL_URL
+          value: "http://classification-model-service/classify"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: result-aggregator-service
+spec:
+  selector:
+    app: result-aggregator
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
