@@ -1,9 +1,4 @@
-opencv_python
-mediapipe
-pandas
-scikit_learn
 numpy
+pandas
 matplotlib
-torch
-pysaliency
-torchvision
+opencv_python
