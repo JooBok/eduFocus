@@ -1,5 +1,5 @@
 *_data
-*contents
 venv
-milkt
+*milkt
+.env
 __pycache__
