@@ -1,25 +1,27 @@
-# 깜빡임 감지를 이용한 집중도 측정
+## 깜빡임 감지를 이용한 집중도 측정
 
 눈 깜빡임 비율(EAR)을 사용하여 깜빡임을 감지하고 깜빡임 빈도를 기반으로 집중도 수준을 측정
 비디오 파일 입력과 실시간 웹캠 입력 파일 각각 생성
 
-## 프로젝트 구조
-.
-├── app.py
+## 구조
 ├── blink_detector.py
+
 ├── concentration_measurement_video.py
+
 ├── concentration_measurement_real.py
+
 ├── requirements.txt
-├── Dockerfile
-└── docker-compose.yaml
+
 
 
 
 - `app.py`: 메인 애플리케이션 파일 (적용 가능한 경우).
+
 - `blink_detector.py`: 깜빡임을 감지하고 집중도를 계산하는 `BlinkDetector` 클래스가 포함된 파일.
 - `concentration_measurement_video.py`: 비디오 파일에서 집중도를 측정하는 파일.
 - `concentration_measurement_real.py`: 웹캠을 사용하여 실시간으로 집중도를 측정하는 파일.
 - `requirements.txt`: Python 종속성 목록.
+
 - `Dockerfile`: 애플리케이션을 컨테이너화하기 위한 Dockerfile.
 - `docker-compose.yaml`: 여러 서비스를 실행하기 위한 Docker Compose 파일.
 
