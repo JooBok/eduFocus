@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-producer
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kafka-producer
+  template:
+    metadata:
+      labels:
+        app: kafka-producer
+    spec:
+      containers:
+      - name: kafka-producer
+        image: IMAGE
+        ports:
+        - containerPort: 5000
+        env:
+        - name: KAFKA_BOOTSTRAP_SERVERS
+          value: "kafka-service:9092"
+        - name: STREAM_URL
+          value: "http://10.41.0.99:8080/video"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka-producer-service
+spec:
+  selector:
+    app: kafka-producer
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000

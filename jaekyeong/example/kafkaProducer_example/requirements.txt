@@ -1,0 +1,4 @@
+flask
+kafka-python
+opencv-python-headless
+gunicorn
