@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eye-tracking
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: eye-tracking
+  template:
+    metadata:
+      labels:
+        app: eye-tracking
+    spec:
+      containers:
+      - name: eye-tracking
+        image: IMAGE
+        ports:
+        - containerPort: 5000
+        env:
+        - name: MONGO_URI
+          valueFrom:
+            secretKeyRef:
+              name: mongo-secret
+              key: mongo-uri
+        - name: MONGO_DB
+          value: "database_name"
+        - name: MONGO_COLLECTION
+          value: "saliency_map"
+        - name: AGGREGATOR_URL
+          value: "http://result-aggregator-service/aggregate"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eye-tracking-service
+spec:
+  selector:
+    app: eye-tracking
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongo-secret
+type: Opaque
+stringData:
+  mongo-uri: mongodb://mongodb-service:27017

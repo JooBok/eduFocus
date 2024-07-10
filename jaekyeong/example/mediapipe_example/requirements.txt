@@ -1,7 +1,9 @@
-opencv-python
+flask
+opencv-python-headless
 mediapipe
-scikit-learn
-scipy
 numpy
-kafka-python
-asyncio
+scipy
+joblib
+requests
+pymongo
+gunicorn

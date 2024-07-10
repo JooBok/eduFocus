@@ -1,24 +1,26 @@
-import cv2
+import time, json, joblib
+import requests, base64, cv2
+
 import mediapipe as mp
 import numpy as np
-import joblib
+from threading import Lock
+
+from flask import Flask, request, jsonify
 from scipy.spatial.transform import Rotation
-import time
-import json
-from kafka import KafkaConsumer
-import asyncio
-import aiohttp
 from pymongo import MongoClient
 
-MONGO_URI = 'mongodb://mongodb-service:27017'
-MONGO_DB = 'database name'
-MONGO_COLLECTION = 'saliency_maps'
+app = Flask(__name__)
 
-def get_mongodb_client():
+MONGO_URI = 'mongodb://mongodb-service:27017'
+MONGO_DB = 'database_name'
+MONGO_COLLECTION = 'saliency_map'
+AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
+
+def mongodb_client():
     return MongoClient(MONGO_URI)
 
-def get_saliency_map_from_mongodb(video_id):
-    client = get_mongodb_client()
+def extract_saliencyMap(video_id):
+    client = mongodb_client()
     db = client[MONGO_DB]
     collection = db[MONGO_COLLECTION]
     
@@ -27,19 +29,7 @@ def get_saliency_map_from_mongodb(video_id):
     if saliency_map_doc:
         return np.array(saliency_map_doc['saliency_map'])
     else:
-        raise ValueError(f"Error occured {video_id}")
-
-################################## 상황에 맞게 구현해야 하는 함수 ##################################
-
-### video stream의 처음 메시지에서 video id를 추출하는 함수 ###
-def extract_video_id(message):
-    pass
-
-### video end 체크 ###
-def video_end(message):
-    pass
-
-####################################################################################################
+        raise ValueError(f"Error occurred {video_id}")
 
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
@@ -49,9 +39,17 @@ face_mesh = mp_face_mesh.FaceMesh(
 )
 mp_drawing = mp.solutions.drawing_utils
 
-### model Load ###
-model_x = joblib.load('model_x.pkl')
-model_y = joblib.load('model_y.pkl')
+### 모델 load ###
+model_x = None
+model_y = None
+model_lock = Lock()
+
+def load_models():
+    global model_x, model_y
+    with model_lock:
+        if model_x is None or model_y is None:
+            model_x = joblib.load('model_x.pkl')
+            model_y = joblib.load('model_y.pkl')
 
 class GazeBuffer:
     def __init__(self, buffer_size=3):
@@ -104,12 +102,6 @@ class GazeFixation:
             self.start_time = None
         return False 
 
-gaze_buffer = GazeBuffer()
-gaze_fixation = GazeFixation()
-gaze_sequence = []
-sequence_length = 10
-prev_gaze = None
-
 def calculate_distance(iris_landmarks, image_height):
     left_iris, right_iris = iris_landmarks
     distance = np.linalg.norm(np.array(left_iris) - np.array(right_iris))
@@ -156,9 +148,56 @@ def limit_gaze_to_screen(gaze_point_x, gaze_point_y, screen_width, screen_height
     gaze_point_y = min(max(gaze_point_y, 0), screen_height - 1)
     return gaze_point_x, gaze_point_y
 
-### 비동기 frame 처리 ###
-async def process_frame(frame, frame_number):
-    global gaze_buffer, gaze_fixation, gaze_sequence, prev_gaze
+sessions = {}
+
+class Session:
+    def __init__(self):
+        self.gaze_buffer = GazeBuffer()
+        self.gaze_fixation = GazeFixation()
+        self.gaze_sequence = []
+        self.prev_gaze = None
+        self.frame_count = 0
+        self.gaze_points = {}
+        self.sequence_length = 10
+
+@app.route('/process_frame', methods=['POST'])
+def process_frame():
+    data = request.json
+    video_id = data.get('video_id')
+    ### base64 encoded frame ###
+    frame_data = data.get('frame')  
+    last_frame = data.get('last_frame', False)
+
+    ### session 구분 (IP) ###
+    ip_address = request.remote_addr
+    session_key = f"{ip_address}_{video_id}"
+
+    if session_key not in sessions:
+        sessions[session_key] = Session()
+
+    session = sessions[session_key]
+
+    ### base64 decoding ###
+    nparr = np.frombuffer(base64.b64decode(frame_data), np.uint8)
+    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    result = process_single_frame(frame, session)
+
+    if result:
+        session.gaze_points[session.frame_count] = result['gaze_point']
+
+    session.frame_count += 1
+
+    if last_frame:
+        saliency_map = extract_saliencyMap(video_id)
+        final_result = calc(session.gaze_points, saliency_map)
+        send_result(final_result, video_id)
+        del sessions[session_key]
+
+    return jsonify({"status": "success"}), 200
+
+def process_single_frame(frame, session):
+    load_models()
 
     image = cv2.flip(frame, 1)
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -185,22 +224,21 @@ async def process_frame(frame, frame_number):
 
             combined_gaze = (left_gaze_corrected + right_gaze_corrected) / 2
 
-            gaze_sequence.append(combined_gaze)
-            if len(gaze_sequence) > sequence_length:
-                gaze_sequence.pop(0)
+            session.gaze_sequence.append(combined_gaze)
 
-            if len(gaze_sequence) == sequence_length:
-                gaze_input = np.array(gaze_sequence).flatten().reshape(1, -1)
-                predicted_x = model_x.predict(gaze_input)[0]
-                predicted_y = model_y.predict(gaze_input)[0]
+            if len(session.gaze_sequence) == session.sequence_length:
+                gaze_input = np.array(session.gaze_sequence).flatten().reshape(1, -1)
+                with model_lock:
+                    predicted_x = model_x.predict(gaze_input)[0]
+                    predicted_y = model_y.predict(gaze_input)[0]
 
-                gaze_buffer.add(np.array([predicted_x, predicted_y]))
-                smoothed_gaze = gaze_buffer.get_average()
+                session.gaze_buffer.add(np.array([predicted_x, predicted_y]))
+                smoothed_gaze = session.gaze_buffer.get_average()
 
-                filtered_gaze = filter_sudden_changes(smoothed_gaze, prev_gaze)
+                filtered_gaze = filter_sudden_changes(smoothed_gaze, session.prev_gaze)
 
                 predicted_x, predicted_y = filtered_gaze
-                prev_gaze = filtered_gaze
+                session.prev_gaze = filtered_gaze
 
                 screen_x = int((predicted_x + 1) * w / 2)
                 screen_y = int((1 - predicted_y) * h / 2)
@@ -209,58 +247,30 @@ async def process_frame(frame, frame_number):
                 screen_x, screen_y = int(screen_x), int(screen_y)
 
                 return {
-                    "frame_number": frame_number,
                     "gaze_point": [screen_x, screen_y]
                 }
 
     return None
-
-### result-aggregator 엔드포인트에 결과값 제출 ###
-async def send_result(session, result):
-    async with session.post("http://result-aggregator-service/aggregate", json=result) as response:
-        return await response.text()
-
-### 결과값 계산 함수 ###
+    
 def calc(temp_data, saliency_map):
     count = 0
     total_frames = len(temp_data)
-    for frame_data in temp_data.values():
-        x, y = frame_data
-        if saliency_map[y][x] > 0.7:
+    for frame_num, gaze_point in temp_data.items():
+        x, y = gaze_point
+        if saliency_map[frame_num][y][x] > 0.7:
             count += 1
     res = count / total_frames
     return res
 
-### kafka producer에서 토픽을 통해 frame 가져오기 ###
-async def process_stream():
-    consumer = KafkaConsumer('kid_face_video', bootstrap_servers=['kafka-service:9092'])
-    
-    temp_data = {}
-    frame_number = 0
-    video_id = None
-    
-    async with aiohttp.ClientSession() as session:
-        for message in consumer:
-            
-            ### 처음 메시지에서 video의 id를 추출 ###
-            if frame_number == 0:
-                video_id = extract_video_id(message)
-            
-            frame = cv2.imdecode(np.frombuffer(message.value, np.uint8), cv2.IMREAD_COLOR)
-            result = await process_frame(frame, frame_number)
-            if result:
-                temp_data[frame_number] = result['gaze_point']
-            frame_number += 1
+def send_result(final_result, video_id):
+    data = {
+        "video_id": video_id,
+        "final_score": final_result
+    }
+    response = requests.post(AGGREGATOR_URL, json=data)
+    if response.status_code != 200:
+        print(f"Failed to send result: {response.text}")
 
-            if is_video_end(message):
-                break
 
-        if video_id is None:
-            raise ValueError("Could not extract video_id from messages")
-
-        saliency_map = get_saliency_map_from_mongodb(video_id)
-        final_result = calc(temp_data, saliency_map)
-
-        await send_result(session, {"final_score": final_result, "video_id": video_id})
-
-asyncio.run(process_stream())
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
