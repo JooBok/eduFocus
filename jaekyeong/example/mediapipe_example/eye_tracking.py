@@ -8,6 +8,38 @@ import json
 from kafka import KafkaConsumer
 import asyncio
 import aiohttp
+from pymongo import MongoClient
+
+MONGO_URI = 'mongodb://mongodb-service:27017'
+MONGO_DB = 'database name'
+MONGO_COLLECTION = 'saliency_maps'
+
+def get_mongodb_client():
+    return MongoClient(MONGO_URI)
+
+def get_saliency_map_from_mongodb(video_id):
+    client = get_mongodb_client()
+    db = client[MONGO_DB]
+    collection = db[MONGO_COLLECTION]
+    
+    saliency_map_doc = collection.find_one({'video_id': video_id})
+    
+    if saliency_map_doc:
+        return np.array(saliency_map_doc['saliency_map'])
+    else:
+        raise ValueError(f"Error occured {video_id}")
+
+################################## 상황에 맞게 구현해야 하는 함수 ##################################
+
+### video stream의 처음 메시지에서 video id를 추출하는 함수 ###
+def extract_video_id(message):
+    pass
+
+### video end 체크 ###
+def video_end(message):
+    pass
+
+####################################################################################################
 
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
@@ -205,32 +237,30 @@ async def process_stream():
     
     temp_data = {}
     frame_number = 0
+    video_id = None
     
     async with aiohttp.ClientSession() as session:
         for message in consumer:
+            
+            ### 처음 메시지에서 video의 id를 추출 ###
+            if frame_number == 0:
+                video_id = extract_video_id(message)
+            
             frame = cv2.imdecode(np.frombuffer(message.value, np.uint8), cv2.IMREAD_COLOR)
             result = await process_frame(frame, frame_number)
             if result:
                 temp_data[frame_number] = result['gaze_point']
             frame_number += 1
 
-            if video_end(message):
+            if is_video_end(message):
                 break
 
-        saliency_map = load_saliency_map()
+        if video_id is None:
+            raise ValueError("Could not extract video_id from messages")
+
+        saliency_map = get_saliency_map_from_mongodb(video_id)
         final_result = calc(temp_data, saliency_map)
 
-        await send_result(session, {"final_score": final_result})
-
-### video end 체크 ###
-def video_end(message):
-    pass
-
-### saliency map extract ###
-def load_saliency_map():
-    with open('saliency_map.json', 'r') as f:
-        saliency_map_list = json.load(f)
-    return np.array(saliency_map_list)
-
+        await send_result(session, {"final_score": final_result, "video_id": video_id})
 
 asyncio.run(process_stream())
