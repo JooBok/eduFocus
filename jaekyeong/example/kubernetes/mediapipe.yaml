@@ -23,6 +23,12 @@ spec:
             value: "kid_face_video"
           - name: AGGREGATOR_URL
             value: "http://result-aggregator-service/aggregate"
+          - name: MONGO_URI
+            value: "mongodb://mongodb-servicd:27017"
+          - name: MONGO_DB
+            value: "database_name"
+          - name: MONGO_COLLECTION
+            value: "saliency_map"
 ---
 apiVersion: apps/v1
 kind: Deployment
