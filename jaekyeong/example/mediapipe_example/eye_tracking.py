@@ -153,6 +153,26 @@ def limit_gaze(gaze_point_x, gaze_point_y, screen_width, screen_height):
     gaze_point_y = min(max(gaze_point_y, 0), screen_height - 1)
     return gaze_point_x, gaze_point_y
 
+def calc(temp_data, saliency_map):
+    count = 0
+    total_frames = len(temp_data)
+    for frame_num, gaze_point in temp_data.items():
+        x, y = gaze_point
+        if saliency_map[frame_num][y][x] > 0.7:
+            count += 1
+    res = count / total_frames
+    return res
+
+def send_result(final_result, video_id):
+    data = {
+        "video_id": video_id,
+        "final_score": final_result
+    }
+    response = requests.post(AGGREGATOR_URL, json=data)
+
+    if response.status_code != 200:
+        print(f"Failed to send result: {response.text}")
+
 ### 세션 저장용 ###
 sessions = {}
 
@@ -162,20 +182,17 @@ class Session:
         self.gaze_fixation = GazeFixation()
         self.gaze_sequence = []
         self.prev_gaze = None
+        self.frame_count = 0
         self.gaze_points = {}
         self.sequence_length = 10
 
 ### api로 받아오기 ###
 @app.route('/process_frame', methods=['POST'])
 def process_frame():
-    data = request.json
-    video_id = data.get('video_id')
-    ### base64 encoded frame ###
-    frame_data = data.get('frame')
-    frame_num = data.get('frame_num')
-    last_frame = data.get('last_frame', False)
+    video_id = request.form['video_id']
+    frame_num = int(request.form['frame_number'])
+    last_frame = request.form['last_frame'].lower() == 'true'
 
-    ### session 구분 (IP) ###
     ip_address = request.remote_addr
     session_key = f"{ip_address}_{video_id}"
 
@@ -184,25 +201,26 @@ def process_frame():
 
     session = sessions[session_key]
 
-    ### base64 decoding ###
-    nparr = np.frombuffer(base64.b64decode(frame_data), np.uint8)
-    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if not last_frame:
+        frame_file = request.files['frame']
+        frame_data = frame_file.read()
+        nparr = np.frombuffer(frame_data, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-    result = process_single_frame(frame, session)
+        result = process_single_frame(frame, session)
+        
+        if result:
+            session.gaze_points[frame_num] = result['gaze_point']
+        
+        session.frame_count += 1
+        return jsonify({"status": "success", "message": "Frame processed"}), 200
 
-    if result:
-        session.gaze_points[frame_num] = result['gaze_point']
-
-    session.frame_count += 1
-
-    if last_frame:
+    else:
         saliency_map = extract_saliencyMap(video_id)
         final_result = calc(session.gaze_points, saliency_map)
         send_result(final_result, video_id)
         del sessions[session_key]
         return jsonify({"status": "success", "message": "Video processing completed"}), 200
-
-    return jsonify({"status": "success", "message": "Frame processed"}), 200
 
 def process_single_frame(frame, session):
     ### model instance load ###
@@ -263,26 +281,6 @@ def process_single_frame(frame, session):
                 }
 
     return None
-    
-def calc(temp_data, saliency_map):
-    count = 0
-    total_frames = len(temp_data)
-    for frame_num, gaze_point in temp_data.items():
-        x, y = gaze_point
-        if saliency_map[frame_num][y][x] > 0.7:
-            count += 1
-    res = count / total_frames
-    return res
-
-def send_result(final_result, video_id):
-    data = {
-        "video_id": video_id,
-        "final_score": final_result
-    }
-    response = requests.post(AGGREGATOR_URL, json=data)
-    if response.status_code != 200:
-        print(f"Failed to send result: {response.text}")
-
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
