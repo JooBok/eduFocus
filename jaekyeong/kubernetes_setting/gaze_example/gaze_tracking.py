@@ -5,11 +5,17 @@ import mediapipe as mp
 import numpy as np
 from threading import Lock
 
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Session
+from flask_session import Session
 from scipy.spatial.transform import Rotation
 from pymongo import MongoClient
+import redis
 
 app = Flask(__name__)
+
+app.config['SESSION_TYPE'] = 'redis'
+app.config['SESSION_REDIS'] = redis.Redis(host='redis-service', port=6379, db=0)
+Session(app)
 
 ################################## Mongo setting ##################################
 MONGO_URI = 'mongodb://mongodb-service:27017'

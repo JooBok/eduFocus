@@ -1,4 +1,5 @@
-flask
+Flask
+Flask-Session
 opencv-python-headless
 mediapipe
 numpy
@@ -7,3 +8,5 @@ joblib
 requests
 pymongo
 gunicorn
+redis
+dnspython
