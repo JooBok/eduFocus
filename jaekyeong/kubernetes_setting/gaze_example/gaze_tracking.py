@@ -5,23 +5,43 @@ import mediapipe as mp
 import numpy as np
 from threading import Lock
 
-from flask import Flask, request, jsonify, Session
-from flask_session import Session
+from flask import Flask, request, jsonify
 from scipy.spatial.transform import Rotation
 from pymongo import MongoClient
-import redis
+import redis, pickle
 
 app = Flask(__name__)
 
-app.config['SESSION_TYPE'] = 'redis'
-app.config['SESSION_REDIS'] = redis.Redis(host='redis-service', port=6379, db=0)
-Session(app)
-
+redis_client = redis.Redis(host='redis-service', port=6379, db=0)
+AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 ################################## Mongo setting ##################################
 MONGO_URI = 'mongodb://mongodb-service:27017'
 MONGO_DB = 'database_name'
 MONGO_COLLECTION = 'saliency_map'
+################################ mediaPipe setting ################################
+mp_face_mesh = mp.solutions.face_mesh
+face_mesh = mp_face_mesh.FaceMesh(
+    refine_landmarks=True,
+    min_detection_confidence=0.7,
+    min_tracking_confidence=0.7
+)
+mp_drawing = mp.solutions.drawing_utils
+################################## model setting ##################################
+global model_x, model_y
+model_x = None
+model_y = None
+model_lock = Lock()
 
+def load_models():
+    global model_x, model_y
+    with model_lock:
+        if model_x is None or model_y is None:
+            model_x = joblib.load('/app/model/model_x.pkl')
+            model_y = joblib.load('/app/model/model_y.pkl')
+
+load_models()
+
+################################## Mongo setting ##################################
 def mongodb_client():
     return MongoClient(MONGO_URI)
 
@@ -36,26 +56,6 @@ def extract_saliencyMap(video_id):
         return np.array(saliency_map_doc['saliency_map'])
     else:
         raise ValueError(f"Error occurred {video_id}")
-################################## model setting ##################################
-model_x = None
-model_y = None
-model_lock = Lock()
-
-def load_models():
-    global model_x, model_y
-    with model_lock:
-        if model_x is None or model_y is None:
-            model_x = joblib.load('model_x.pkl')
-            model_y = joblib.load('model_y.pkl')
-################################ mediaPipe setting ################################
-mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(
-    refine_landmarks=True,
-    min_detection_confidence=0.7,
-    min_tracking_confidence=0.7
-)
-mp_drawing = mp.solutions.drawing_utils
-
 ################################# calc Class, def #################################
 class GazeBuffer:
     def __init__(self, buffer_size=3):
@@ -107,7 +107,46 @@ class GazeFixation:
         else:
             self.start_time = None
         return False 
+################################### Session ###################################
+sessions = {}
 
+class Session:
+    def __init__(self):
+        self.gaze_buffer = GazeBuffer()
+        self.gaze_fixation = GazeFixation()
+        self.gaze_sequence = []
+        self.prev_gaze = None
+        self.final_result = {}
+        self.sequence_length = 10
+    def to_dict(self):
+        return {
+            'gaze_buffer': self.gaze_buffer,
+            'gaze_fixation': self.gaze_fixation,
+            'gaze_sequence': self.gaze_sequence,
+            'prev_gaze': self.prev_gaze,
+            'final_result': self.final_result,
+            'sequence_length': self.sequence_length
+        }
+    @classmethod
+    def from_dict(cls, data):
+        session = cls()
+        session.gaze_buffer = data['gaze_buffer']
+        session.gaze_fixation = data['gaze_fixation']
+        session.gaze_sequence = data['gaze_sequence']
+        session.prev_gaze = data['prev_gaze']
+        session.final_result = data['final_result']
+        session.sequence_length = data['sequence_length']
+        return session
+
+def get_session(session_key):
+    session_data = redis_client.get(session_key)
+    if session_data:
+        return Session.from_dict(pickle.loads(session_data))
+    return Session()
+
+def save_session(session_key, session):
+    redis_client.set(session_key, pickle.dumps(session.to_dict()), ex=1800)
+###############################################################################
 def calculate_distance(iris_landmarks, image_height):
     left_iris, right_iris = iris_landmarks
     distance = np.linalg.norm(np.array(left_iris) - np.array(right_iris))
@@ -165,7 +204,6 @@ def calc(final_result, saliency_map):
     return res
 
 ################################# Send result #################################
-AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 def send_result(final_result, video_id):
     data = {
         "video_id": video_id,
@@ -175,19 +213,6 @@ def send_result(final_result, video_id):
 
     if response.status_code != 200:
         print(f"Failed to send result: {response.text}")
-
-################################### Session ###################################
-sessions = {}
-
-class Session:
-    def __init__(self):
-        self.gaze_buffer = GazeBuffer()
-        self.gaze_fixation = GazeFixation()
-        self.gaze_sequence = []
-        self.prev_gaze = None
-        self.final_result = {}
-        self.sequence_length = 10
-
 ################################## main code ##################################
 @app.route('/gaze', methods=['POST'])
 def process_frame():
@@ -198,10 +223,7 @@ def process_frame():
     ip_address = request.remote_addr
     session_key = f"{ip_address}_{video_id}"
 
-    if session_key not in sessions:
-        sessions[session_key] = Session()
-
-    session = sessions[session_key]
+    session = get_session[session_key]
 
     if not last_frame:
         frame_file = request.files['frame']
@@ -224,9 +246,6 @@ def process_frame():
         return jsonify({"status": "success", "message": "Video processing completed"}), 200
 
 def process_single_frame(frame, session):
-    ### model instance load ###
-    load_models()
-
     image = cv2.flip(frame, 1)
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     results = face_mesh.process(image_rgb)
