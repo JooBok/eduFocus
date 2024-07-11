@@ -11,14 +11,11 @@ from pymongo import MongoClient
 
 app = Flask(__name__)
 
-### Mongo DB ###
+################################## Mongo setting ##################################
 MONGO_URI = 'mongodb://mongodb-service:27017'
 MONGO_DB = 'database_name'
 MONGO_COLLECTION = 'saliency_map'
-### Result Path ###
-AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 
-### Mongo setting ###
 def mongodb_client():
     return MongoClient(MONGO_URI)
 
@@ -33,8 +30,7 @@ def extract_saliencyMap(video_id):
         return np.array(saliency_map_doc['saliency_map'])
     else:
         raise ValueError(f"Error occurred {video_id}")
-
-### 모델 load ###
+################################## model setting ##################################
 model_x = None
 model_y = None
 model_lock = Lock()
@@ -45,8 +41,7 @@ def load_models():
         if model_x is None or model_y is None:
             model_x = joblib.load('model_x.pkl')
             model_y = joblib.load('model_y.pkl')
-
-### mediaPipe setting ###
+################################ mediaPipe setting ################################
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
     refine_landmarks=True,
@@ -55,7 +50,7 @@ face_mesh = mp_face_mesh.FaceMesh(
 )
 mp_drawing = mp.solutions.drawing_utils
 
-### calc Class, def ###
+################################# calc Class, def #################################
 class GazeBuffer:
     def __init__(self, buffer_size=3):
         self.buffer = []
@@ -163,6 +158,8 @@ def calc(temp_data, saliency_map):
     res = count / total_frames
     return res
 
+################################# Send result #################################
+AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 def send_result(final_result, video_id):
     data = {
         "video_id": video_id,
@@ -173,7 +170,7 @@ def send_result(final_result, video_id):
     if response.status_code != 200:
         print(f"Failed to send result: {response.text}")
 
-### 세션 저장용 ###
+################################### Session ###################################
 sessions = {}
 
 class Session:
@@ -185,7 +182,7 @@ class Session:
         self.gaze_points = {}
         self.sequence_length = 10
 
-### api로 받아오기 ###
+################################## main code ##################################
 @app.route('/process_frame', methods=['POST'])
 def process_frame():
     video_id = request.form['video_id']
