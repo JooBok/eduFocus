@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from util.analysis_realtime import analysis
+from analysis_server import analysis
 import cv2, requests
 import numpy as np
 
