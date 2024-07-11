@@ -11,11 +11,14 @@ from pymongo import MongoClient
 
 app = Flask(__name__)
 
+### Mongo DB ###
 MONGO_URI = 'mongodb://mongodb-service:27017'
 MONGO_DB = 'database_name'
 MONGO_COLLECTION = 'saliency_map'
+### Result Path ###
 AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 
+### Mongo setting ###
 def mongodb_client():
     return MongoClient(MONGO_URI)
 
@@ -31,14 +34,6 @@ def extract_saliencyMap(video_id):
     else:
         raise ValueError(f"Error occurred {video_id}")
 
-mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(
-    refine_landmarks=True,
-    min_detection_confidence=0.7,
-    min_tracking_confidence=0.7
-)
-mp_drawing = mp.solutions.drawing_utils
-
 ### 모델 load ###
 model_x = None
 model_y = None
@@ -51,6 +46,16 @@ def load_models():
             model_x = joblib.load('model_x.pkl')
             model_y = joblib.load('model_y.pkl')
 
+### mediaPipe setting ###
+mp_face_mesh = mp.solutions.face_mesh
+face_mesh = mp_face_mesh.FaceMesh(
+    refine_landmarks=True,
+    min_detection_confidence=0.7,
+    min_tracking_confidence=0.7
+)
+mp_drawing = mp.solutions.drawing_utils
+
+### calc Class, def ###
 class GazeBuffer:
     def __init__(self, buffer_size=3):
         self.buffer = []
@@ -143,11 +148,12 @@ def filter_sudden_changes(new_gaze, prev_gaze, max_change_x=15, max_change_y=15)
         new_gaze[1] = prev_gaze[1] + (new_gaze[1] - prev_gaze[1]) * (max_change_y / change_y)
     return new_gaze
 
-def limit_gaze_to_screen(gaze_point_x, gaze_point_y, screen_width, screen_height):
+def limit_gaze(gaze_point_x, gaze_point_y, screen_width, screen_height):
     gaze_point_x = min(max(gaze_point_x, 0), screen_width - 1)
     gaze_point_y = min(max(gaze_point_y, 0), screen_height - 1)
     return gaze_point_x, gaze_point_y
 
+### 세션 저장용 ###
 sessions = {}
 
 class Session:
@@ -156,16 +162,17 @@ class Session:
         self.gaze_fixation = GazeFixation()
         self.gaze_sequence = []
         self.prev_gaze = None
-        self.frame_count = 0
         self.gaze_points = {}
         self.sequence_length = 10
 
+### api로 받아오기 ###
 @app.route('/process_frame', methods=['POST'])
 def process_frame():
     data = request.json
     video_id = data.get('video_id')
     ### base64 encoded frame ###
-    frame_data = data.get('frame')  
+    frame_data = data.get('frame')
+    frame_num = data.get('frame_num')
     last_frame = data.get('last_frame', False)
 
     ### session 구분 (IP) ###
@@ -184,7 +191,7 @@ def process_frame():
     result = process_single_frame(frame, session)
 
     if result:
-        session.gaze_points[session.frame_count] = result['gaze_point']
+        session.gaze_points[frame_num] = result['gaze_point']
 
     session.frame_count += 1
 
@@ -193,10 +200,12 @@ def process_frame():
         final_result = calc(session.gaze_points, saliency_map)
         send_result(final_result, video_id)
         del sessions[session_key]
+        return jsonify({"status": "success", "message": "Video processing completed"}), 200
 
-    return jsonify({"status": "success"}), 200
+    return jsonify({"status": "success", "message": "Frame processed"}), 200
 
 def process_single_frame(frame, session):
+    ### model instance load ###
     load_models()
 
     image = cv2.flip(frame, 1)
@@ -226,6 +235,9 @@ def process_single_frame(frame, session):
 
             session.gaze_sequence.append(combined_gaze)
 
+            if len(session.gaze_sequence) > session.sequence_length:
+                session.gaze_sequence.pop(0)
+
             if len(session.gaze_sequence) == session.sequence_length:
                 gaze_input = np.array(session.gaze_sequence).flatten().reshape(1, -1)
                 with model_lock:
@@ -243,7 +255,7 @@ def process_single_frame(frame, session):
                 screen_x = int((predicted_x + 1) * w / 2)
                 screen_y = int((1 - predicted_y) * h / 2)
 
-                screen_x, screen_y = limit_gaze_to_screen(screen_x, screen_y, w, h)
+                screen_x, screen_y = limit_gaze(screen_x, screen_y, w, h)
                 screen_x, screen_y = int(screen_x), int(screen_y)
 
                 return {
