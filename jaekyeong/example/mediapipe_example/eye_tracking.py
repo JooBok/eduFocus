@@ -182,7 +182,6 @@ class Session:
         self.gaze_fixation = GazeFixation()
         self.gaze_sequence = []
         self.prev_gaze = None
-        self.frame_count = 0
         self.gaze_points = {}
         self.sequence_length = 10
 
@@ -212,7 +211,6 @@ def process_frame():
         if result:
             session.gaze_points[frame_num] = result['gaze_point']
         
-        session.frame_count += 1
         return jsonify({"status": "success", "message": "Frame processed"}), 200
 
     else:
