@@ -223,7 +223,7 @@ def process_frame():
     ip_address = request.remote_addr
     session_key = f"{ip_address}_{video_id}"
 
-    session = get_session[session_key]
+    session = get_session(session_key)
 
     if not last_frame:
         frame_file = request.files['frame']
@@ -242,7 +242,6 @@ def process_frame():
         saliency_map = extract_saliencyMap(video_id)
         final_res = calc(session.final_result, saliency_map)
         send_result(final_res, video_id)
-        del sessions[session_key]
         return jsonify({"status": "success", "message": "Video processing completed"}), 200
 
 def process_single_frame(frame, session):
