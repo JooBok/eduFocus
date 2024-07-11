@@ -17,7 +17,7 @@ spec:
         image: IMAGE_PLACE
         env:
         - name: CLASSIFICATION_MODEL_URL
-          value: "http://classification-model-service/classify"
+          value: "http://classification-model-service/aggregate"
 ---
 apiVersion: v1
 kind: Service

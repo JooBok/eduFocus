@@ -1,0 +1,12 @@
+keras==2.2.4 
+tensorflow==1.12.0 
+h5py==2.7.0 
+opencv-python==3.4.0.12
+Flask==2.0.3
+numpy==1.19.5
+pandas==0.19.1
+scipy 
+matplotlib 
+scikit-learn 
+jupyter 
+ipython
