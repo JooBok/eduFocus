@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-express
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo-express
+  template:
+    metadata:
+      labels:
+        app: mongo-express
+    spec:
+      containers:
+      - name: mongo-express
+        image: mongo-express:latest
+        ports:
+        - containerPort: 8081
+        env:
+        - name: ME_CONFIG_MONGODB_ADMINUSERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MONGODB_USERNAME
+        - name: ME_CONFIG_MONGODB_ADMINPASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: MONGODB_PASSWORD
+        - name: ME_CONFIG_MONGODB_URL
+          value: mongodb://$(MONGODB_USERNAME):$(MONGODB_PASSWORD)@mongodb:27017/$(MONGODB_DB)?authSource=admin
+        - name: ME_CONFIG_BASICAUTH_USERNAME
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: ME_CONFIG_BASICAUTH_USERNAME
+        - name: ME_CONFIG_BASICAUTH_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: ME_CONFIG_BASICAUTH_PASSWORD
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-express
+spec:
+  ports:
+  - port: 8081
+    targetPort: 8081
+  selector:
+    app: mongo-express
