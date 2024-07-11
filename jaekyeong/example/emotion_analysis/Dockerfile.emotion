@@ -5,10 +5,23 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
+    cmake \
+    git \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+COPY dlib /app/dlib
+RUN cd dlib && \
+    mkdir build && \
+    cd build && \
+    cmake .. && \
+    cmake --build . && \
+    cd .. && \
+    python setup.py install && \
+    cd .. && \
+    rm -rf dlib
 
 COPY . .
 
