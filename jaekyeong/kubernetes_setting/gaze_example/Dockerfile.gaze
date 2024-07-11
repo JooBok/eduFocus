@@ -10,7 +10,9 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY gaze_tracking.py .
+
+COPY model/model_x.pkl model/model_y.pkl ./model/
 
 EXPOSE 5000
 
