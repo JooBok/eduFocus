@@ -17,10 +17,6 @@ spec:
         image: IMAGE
         ports:
         - containerPort: 5000
-        volumeMounts:
-        - name: model-volume
-          mountPath: /app/model
-          readOnly: true
         env:
         - name: MONGO_URI
           valueFrom:
@@ -33,10 +29,6 @@ spec:
           value: "saliency_map"
         - name: AGGREGATOR_URL
           value: "http://result-aggregator-service/aggregate"
-      volumes:
-      - name: model-volume
-        persistentVolumeClaim:
-          claimName: model-pvc
 ---
 apiVersion: v1
 kind: Service
