@@ -12,8 +12,8 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY dlib /app/dlib
-RUN cd dlib && \
+RUN git clone https://github.com/davisking/dlib.git
+    cd dlib && \
     mkdir build && \
     cd build && \
     cmake .. && \

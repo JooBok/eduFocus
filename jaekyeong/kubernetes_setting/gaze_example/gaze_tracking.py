@@ -143,9 +143,6 @@ def get_session(session_key):
     if session_data:
         return Session.from_dict(pickle.loads(session_data))
     return Session()
-
-def save_session(session_key, session):
-    redis_client.set(session_key, pickle.dumps(session.to_dict()), ex=1800)
 ###############################################################################
 def calculate_distance(iris_landmarks, image_height):
     left_iris, right_iris = iris_landmarks

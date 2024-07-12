@@ -1,9 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: emotion-analysis-deployment
-  labels:
-    app: emotion-analysis
+  name: emotion-analysis
 spec:
   replicas: 2
   selector:

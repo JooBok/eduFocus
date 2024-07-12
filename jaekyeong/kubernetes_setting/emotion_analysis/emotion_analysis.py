@@ -2,17 +2,35 @@ from flask import Flask, request, jsonify
 from analysis_server import analysis
 import cv2, requests
 import numpy as np
+import redis, pickle
 
 app = Flask(__name__)
 ana = analysis()
 
 AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
+#################################### Session ##################################
 sessions = {}
+redis_client = redis.Redis(host='redis-service', port=6379, db=1)
 
 class Session:
     def __init__(self):
         self.final_result = {}
+    def to_dict(self):
+        return{
+            'final_result':self.final_result
+            }
+    @classmethod
+    def from_dict(cls, data):
+        session = cls()
+        session.final_result = data['final_result']
+        return session
 
+def get_session(session_key):
+    session_data = redis_client.get(session_key)
+    if session_data:
+        return Session.from_dict(pickle.loads(session_data))
+    return Session()
+##############################################################################
 def calc(final_result):
     if not final_result:
         return 0.0
@@ -41,10 +59,7 @@ def analyze_frame():
     ip_address = request.remote_addr
     session_key = f"{ip_address}_{video_id}"
 
-    if session_key not in sessions:
-        sessions[session_key] = Session()
-
-    session = sessions[session_key]
+    session = get_session(session_key)
 
     if not last_frame:
         frame_file = request.files['frame']
@@ -56,12 +71,11 @@ def analyze_frame():
 
         if result:
             session.final_result[frame_num] = result
-
+            
         return jsonify({"status": "success", "message": "Frame processed"}), 200
     else:
         final_res = calc(session.final_result)
         send_result(final_res, video_id)
-        del sessions[session_key]
         return jsonify({"status": "success", "message": "Video processing completed"}), 200
 
 
