@@ -38,7 +38,6 @@ class BlinkDetector:
         v1 = np.linalg.norm(eye_landmarks[1] - eye_landmarks[5])
         v2 = np.linalg.norm(eye_landmarks[2] - eye_landmarks[4])
         h = np.linalg.norm(eye_landmarks[0] - eye_landmarks[3])
-        ear = (v1 + v2) / (2.0 * h)
         if h == 0:
             return 0
         ear = (v1 + v2) / (2.0 * h)
@@ -152,7 +151,6 @@ class BlinkDetector:
     def calculate_time_weight(self, index, frame_number):
         # 시간에 따른 가중치 계산
         # index: EAR 시퀀스의 인덱스
-        # elapsed_time: 경과 시간
         m = len(self.ear_sequence)
         if m == 0:
             return 0
@@ -187,40 +185,44 @@ class Session:
         self.end_frame = None
         self.total_concentration_scores = []
 
+def get_session(session_key):
+    if session_key not in sessions:
+        sessions[session_key] = Session()
+    return sessions[session_key]
+
 ### api 엔드포인트 정의 ###
 @app.route('/process_frame', methods=['POST'])
 def process_frame():
-    data = request.json
-    video_id = data.get('video_id')
-    frame_data = data.get('frame')  # 인코딩 없는 이미지 데이터
-    frame_number = data.get('frame_number')
-    is_last_frame = data.get('is_last_frame', False)
+    video_id = request.form['video_id']
+    frame_number = int(request.form['frame_number'])
+    is_last_frame = request.form['last_frame'].lower() == 'true'
 
     ip_address = request.remote_addr
     session_key = f"{ip_address}_{video_id}"
 
-    if session_key not in sessions:
-        sessions[session_key] = Session()
+    session = get_session[session_key]
 
-    session = sessions[session_key]
+    if not is_last_frame:
+        frmae_file = request.files['frame']
+        frame_data = frmae_file.read()
+        frame = np.frombuffer(frame_data, np.uint8)
+        frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
 
-    # 이미지를 numpy 배열로 변환
-    frame = np.array(frame_data, dtype=np.uint8)
-    frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
-
-    # 깜빡임 감지
-    left_ear, right_ear, blink_count, concentration, face_landmarks = session.blink_detector.detect_blink(frame)
+        # 깜빡임 감지
+        left_ear, right_ear, blink_count, concentration, face_landmarks = session.blink_detector.detect_blink(frame)
     
-    # 집중도 데이터 업데이트
-    if face_landmarks is not None:
-        avg_ear = (left_ear + right_ear) / 2.0
-        session.total_concentration += concentration
-        session.frame_count += 1
-        session.total_concentration_scores.append(concentration)
+        # 집중도 데이터 업데이트
+        if face_landmarks is not None:
+            avg_ear = (left_ear + right_ear) / 2.0
+            session.total_concentration += concentration
+            session.frame_count += 1
+            session.total_concentration_scores.append(concentration)
 
-    if is_last_frame:
-        session.end_frame = frame_number
+        return jsonify({"status": "success", "message": "Frame processed"}), 200
+
+    else:
         # 최종 집중도 계산 및 출력
+        session.end_frame = frame_number
         if session.frame_count > 0:
             average_concentration = session.total_concentration / session.frame_count
             concentration_percentage = average_concentration * 100
@@ -240,8 +242,9 @@ def process_frame():
         send_result(final_concentration_score, video_id)
         del sessions[session_key]
         return jsonify({"status": "success", "message": "Video processing completed", "final_concentration_score": final_concentration_score}), 200
-
+    
     return jsonify({"status": "success", "message": "Frame processed"}), 200
+
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
