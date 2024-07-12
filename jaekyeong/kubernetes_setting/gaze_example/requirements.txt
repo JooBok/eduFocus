@@ -1,11 +1,11 @@
-opencv-python-headless
-joblib
+opencv-python-headless==4.9.0.80
+joblib==1.2.0
 requests
-mediapipe
-numpy
+mediapipe==0.10.14
+numpy==1.24.3
 flask
-scipy
+scipy==1.11.1
 pymongo
 redis
 gunicorn
-scikit-learn
+scikit-learn==1.2.2

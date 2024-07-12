@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: emotion-analysis
-        image: IMAGE
+        image: pepi10/emotion-test:test
         ports:
         - containerPort: 5000
         env:
