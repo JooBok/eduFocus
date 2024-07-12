@@ -214,16 +214,16 @@ def send_result(final_result, video_id):
 @app.route('/gaze', methods=['POST'])
 def process_frame():
     video_id = request.form['video_id']
+    ip_address = request.form['ip_address']
     frame_num = int(request.form['frame_number'])
     last_frame = request.form['last_frame'].lower() == 'true'
 
-    ip_address = request.remote_addr
     session_key = f"{ip_address}_{video_id}"
 
     session = get_session(session_key)
 
     if not last_frame:
-        frame_file = request.files['frame']
+        frame_file = request.form['frame']
         frame_data = frame_file.read()
         nparr = np.frombuffer(frame_data, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
