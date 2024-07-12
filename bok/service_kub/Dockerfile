@@ -17,7 +17,7 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install -r /app/requirements.txt
 
 # 앱 소스 코드 복사
-COPY ./app /app
+COPY ./application /app
 
-# 애플리케이션 실행 명령
-CMD ["python3", "/app/main.py"]
+# # 애플리케이션 실행 명령
+# CMD ["python3", "/app/main.py"]

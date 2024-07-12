@@ -15,6 +15,9 @@ spec:
       containers:
       - name: saliency
         image: joobok/mongodb:v1.0  # Docker Hub 또는 다른 레지스트리에 업로드한 이미지
+        # command: ["python3", "/app/main.py"]  # Dockerfile에 CMD 설정이 안되어 있는 경우
+        command: ["bin/sh"]
+        args: ["-c", "Python3 /app/main.py"]
         ports:
         - containerPort: 80  # 필요한 경우 포트 수정
         env:
@@ -41,15 +44,15 @@ spec:
         - name: app-volume
           mountPath: /app  # 컨테이너 내부의 애플리케이션 경로
         - name: contents-volume
-          mountPath: /app/contents  # 컨테이너 내부의 컨텐츠
+          mountPath: /app/contents  # 컨테이너 내부의 컨텐츠 경로
       volumes:
       - name: app-volume
         hostPath:
-          path: /home/bok/eduFocus/bok/service_kub/app  # 실제 애플리케이션 경로
+          path: /home/bok/eduFocus/bok/service_kub/app  # 로컬 애플리케이션 경로
           type: Directory
       - name: contents-volume
         hostPath:
-          path: /home/bok/eduFocus/bok/service_kub/contents  # 실제 컨텐츠 경로
+          path: /home/bok/eduFocus/bok/service_kub/contents  # 로컬 컨텐츠 경로
           type: Directory
 
 ---
