@@ -1,4 +1,4 @@
-FROM python:3.8-slim
+FROM python:3.11-slim
 
 WORKDIR /app
 
@@ -7,11 +7,12 @@ RUN apt-get update && apt-get install -y \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
+RUN pip install --upgrade pip
+
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY gaze_tracking.py .
-
 COPY model/model_x.pkl model/model_y.pkl ./model/
 
 EXPOSE 5000
