@@ -62,7 +62,7 @@ def analyze_frame():
     session = get_session(session_key)
 
     if not last_frame:
-        frame_file = request.files['frame']
+        frame_file = request.form['frame']
         frame_data = frame_file.read()
         nparr = np.frombuffer(frame_data, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
