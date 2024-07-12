@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: aggregator
+  name: result-aggregator
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: aggregator
+      app: result-aggregator
   template:
     metadata:
       labels:
-        app: aggregator
+        app: result-aggregator
     spec:
       containers:
-      - name: aggregator
+      - name: result-aggregator
         image: pepi10/aggr-test:latest
         env:
         - name: MINIO_ENDPOINT
@@ -30,3 +30,15 @@ spec:
               key: secret-key
         - name: MINIO_SECURE
           value: "false"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: result-aggregator-service
+spec:
+  selector:
+    app: result-aggregator
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
