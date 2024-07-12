@@ -40,10 +40,11 @@ def calc(final_result):
     res = c_frames / total_frames
     return res
 
-def send_result(final_result, video_id):
+def send_result(final_result, video_id, ip_address):
     data = {
         "video_id": video_id,
-        "final_score": final_result
+        "final_score": final_result,
+        "ip_address": ip_address
     }
     response = requests.post(AGGREGATOR_URL, json=data)
 
@@ -55,8 +56,8 @@ def analyze_frame():
     video_id = request.form['video_id']
     frame_num = int(request.form['frame_number'])
     last_frame = request.form['last_frame'].lower() == 'true'
+    ip_address = request.form['ip_address']
 
-    ip_address = request.remote_addr
     session_key = f"{ip_address}_{video_id}"
 
     session = get_session(session_key)
@@ -75,7 +76,7 @@ def analyze_frame():
         return jsonify({"status": "success", "message": "Frame processed"}), 200
     else:
         final_res = calc(session.final_result)
-        send_result(final_res, video_id)
+        send_result(final_res, video_id, ip_address)
         return jsonify({"status": "success", "message": "Video processing completed"}), 200
 
 

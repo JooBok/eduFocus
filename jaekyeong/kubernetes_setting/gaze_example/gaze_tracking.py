@@ -201,10 +201,11 @@ def calc(final_result, saliency_map):
     return res
 
 ################################# Send result #################################
-def send_result(final_result, video_id):
+def send_result(final_result, video_id, ip_address):
     data = {
         "video_id": video_id,
-        "final_score": final_result
+        "final_score": final_result,
+        "ip_address": ip_address
     }
     response = requests.post(AGGREGATOR_URL, json=data)
 
@@ -238,7 +239,7 @@ def process_frame():
     else:
         saliency_map = extract_saliencyMap(video_id)
         final_res = calc(session.final_result, saliency_map)
-        send_result(final_res, video_id)
+        send_result(final_res, video_id, ip_address)
         return jsonify({"status": "success", "message": "Video processing completed"}), 200
 
 def process_single_frame(frame, session):
