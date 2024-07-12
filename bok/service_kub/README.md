@@ -16,3 +16,7 @@ bash kube.sh
 ```
 
 ### 이미지 빌드 및 kubernetes실행 셸파일은 메인에 통합될 수 있음
+
+mongo-express: 8081
+mongodb: 27017
+docker: 8000

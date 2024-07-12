@@ -29,6 +29,8 @@ spec:
               name: app-config
               key: MONGODB_PASSWORD
 
+---
+
 apiVersion: v1
 kind: Service
 metadata:

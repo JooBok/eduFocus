@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: saliency
-        image: your_image_name  # Docker Hub 또는 다른 레지스트리에 업로드한 이미지
+        image: joobok/mongodb:v1.0  # Docker Hub 또는 다른 레지스트리에 업로드한 이미지
         ports:
         - containerPort: 80  # 필요한 경우 포트 수정
         env:
@@ -39,16 +39,20 @@ spec:
               key: MONGODB_DB
         volumeMounts:
         - name: app-volume
-          mountPath: /app
+          mountPath: /app  # 컨테이너 내부의 애플리케이션 경로
         - name: contents-volume
-          mountPath: /app/contents
+          mountPath: /app/contents  # 컨테이너 내부의 컨텐츠
       volumes:
       - name: app-volume
         hostPath:
-          path: /path/to/your/app  # 실제 애플리케이션 경로
+          path: /home/bok/eduFocus/bok/service_kub/app  # 실제 애플리케이션 경로
+          type: Directory
       - name: contents-volume
         hostPath:
-          path: /path/to/your/contents  # 실제 컨텐츠 경로
+          path: /home/bok/eduFocus/bok/service_kub/contents  # 실제 컨텐츠 경로
+          type: Directory
+
+---
 
 apiVersion: v1
 kind: Service
