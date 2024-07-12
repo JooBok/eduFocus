@@ -1,5 +1,6 @@
-flask
-opencv-python-headless
-mediapipe
-numpy
-requests
+Flask==2.0.1
+requests==2.25.1
+opencv-python-headless==4.9.0.80
+mediapipe==0.10.14
+numpy==1.26.1
+gunicorn==20.1.0
