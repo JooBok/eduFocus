@@ -52,7 +52,7 @@ class GazeCalibration:
         self.collected_data[key].append(gaze_point)
     
     ### $ 데이터 증강 ###
-    def augment_data(self, X, y, num_augmented = 100):
+    def augment_data(self, X, y, num_augmented = 1000):
         augmented_X, augmented_y = [], []
         for _ in range(num_augmented):
             idx = np.random.randint(0, len(X))
@@ -126,7 +126,7 @@ class GazeCalibration:
                 if new_score > old_score:
                     print("New model performs better. Saving new model and combining data.")
                     self.model = new_model
-                    joblib.dump(self.model, 'gaze_model.pkl')
+                    joblib.dump(self.model, 'new_gaze_model.pkl')
                     combined_data = self.combine_data(old_data, self.collected_data)
                     self.save_data_to_json(data=combined_data)
                 else:
