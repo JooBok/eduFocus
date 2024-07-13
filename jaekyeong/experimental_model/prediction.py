@@ -51,7 +51,7 @@ class GazeFixation:
     $ duration: 시선이 고정된 상태로 인식되기 위해 요구되는 최소 지속 시간
     $ window_size: 이전 프레임과의 연계 (프레임 개수)
     """
-    def __init__(self, velocity_threshold=0.1, duration=0.2, window_size=6):
+    def __init__(self, velocity_threshold=0.1, duration=0.2, window_size=3):
         self.velocity_threshold = velocity_threshold
         self.duration = duration
         self.window_size = window_size
@@ -131,6 +131,11 @@ def limit_gaze_to_screen(gaze_point_x, gaze_point_y, screen_width, screen_height
     gaze_point_y = min(max(gaze_point_y, 0), screen_height - 1)
     return gaze_point_x, gaze_point_y
 
+def calculate_combined_gaze(left_gaze, right_gaze, head_rotation, distance):
+    combined_gaze = (left_gaze + right_gaze) / 2
+    head_rotation_euler = Rotation.from_matrix(head_rotation).as_euler('xyz')
+    return np.concatenate([combined_gaze, head_rotation_euler, [distance]])
+
 gaze_buffer = GazeBuffer()
 gaze_fixation = GazeFixation()
 gaze_sequence = []
@@ -173,7 +178,7 @@ while cap.isOpened():
             left_gaze_corrected = correct_gaze_vector(left_gaze, head_rotation)
             right_gaze_corrected = correct_gaze_vector(right_gaze, head_rotation)
 
-            combined_gaze = (left_gaze_corrected + right_gaze_corrected) / 2
+            combined_gaze = calculate_combined_gaze(left_gaze_corrected, right_gaze_corrected, head_rotation, estimated_distance)
 
             gaze_sequence.append(combined_gaze)
             if len(gaze_sequence) > sequence_length:
