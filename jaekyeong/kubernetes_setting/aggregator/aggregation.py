@@ -55,6 +55,16 @@ def aggregate():
             content_type="application/csv"  # type 설정정
         )
 
+        ### Local에 저장 ###
+        local_path = '/home/fp/storage'
+        os.makedirs(local_path, exist_ok=True)
+        local_file = os.path.join(local_path, "aggregated_data.csv")
+        ### 없으면 헤더 있게 생성, 있으면 append ###
+        if not os.path.exists(local_file):
+            df.to_csv(local_file, index=False, mode='w')
+        else:
+            df.to_csv(local_file, index=False, mode='a', header=False)
+
         ### Classification model 데이터 전송 ###
         ### 전송 데이터 예시 {"emotion": 0.75, "gaze": 0.82, "blink": 0.63} ###     
         response = requests.post(CLASSIFICATION_MODEL_URL, json=data_store[ip_address][video_id])

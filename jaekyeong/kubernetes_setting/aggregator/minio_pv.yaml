@@ -9,6 +9,6 @@ spec:
     - ReadWriteOnce
   persistentVolumeReclaimPolicy: Retain
   storageClassName: standard
-  nfs:
-    server: nfs-server.default.svc.cluster.local
-    path: "/path/to/data"
+  hostPath:
+    path: "/mnt/data/minio"
+    type: DirectoryOrCreate
