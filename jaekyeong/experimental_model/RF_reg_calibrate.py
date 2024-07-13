@@ -1,5 +1,7 @@
 import cv2
 import mediapipe as mp
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf.symbol_database")
 import numpy as np
 import pandas as pd
 
@@ -52,7 +54,7 @@ class GazeCalibration:
         self.collected_data[key].append(gaze_point)
     
     ### $ 데이터 증강 ###
-    def augment_data(self, X, y, num_augmented = 1000):
+    def augment_data(self, X, y, num_augmented = 777):
         augmented_X, augmented_y = [], []
         for _ in range(num_augmented):
             idx = np.random.randint(0, len(X))
@@ -177,7 +179,14 @@ def estimate_head_pose(face_landmarks):
     right_eye = np.array([face_landmarks.landmark[263].x, face_landmarks.landmark[263].y, face_landmarks.landmark[263].z])
     face_normal = np.cross(right_eye - nose, left_eye - nose)
     face_normal /= np.linalg.norm(face_normal)
-    rotation_matrix = Rotation.align_vectors([[0, 0, -1]], [face_normal])[0].as_matrix()
+
+    try:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            rotation_matrix = Rotation.align_vectors([[0, 0, -1]], [face_normal])[0].as_matrix()
+    except Exception as e:
+        print(f"Error in head pose estimation: {e}")
+        rotation_matrix = np.eye(3)
     return rotation_matrix
 
 ### 머리 회전과 시선 벡터 추적 ###
