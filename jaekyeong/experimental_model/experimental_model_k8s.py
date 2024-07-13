@@ -1,5 +1,7 @@
 import time, json, joblib
 import requests, base64, cv2
+import warnings
+warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf.symbol_database")
 
 import mediapipe as mp
 import numpy as np
@@ -161,11 +163,15 @@ def estimate_head_pose(face_landmarks):
     left_eye = np.array([face_landmarks.landmark[33].x, face_landmarks.landmark[33].y, face_landmarks.landmark[33].z])
     right_eye = np.array([face_landmarks.landmark[263].x, face_landmarks.landmark[263].y, face_landmarks.landmark[263].z])
     face_normal = np.cross(right_eye - nose, left_eye - nose)
-    if np.linalg.norm(face_normal) > 1e-6:
-        face_normal = face_normal / np.linalg.norm(face_normal)
-        rotation_matrix = Rotation.align_vectors([[0, 0, -1]], [face_normal])[0].as_matrix()
-    else:
-        rotation_matrix = np.eye(3) 
+    face_normal /= np.linalg.norm(face_normal)
+
+    try:
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            rotation_matrix = Rotation.align_vectors([[0, 0, -1]], [face_normal])[0].as_matrix()
+    except Exception as e:
+        print(f"Error in head pose estimation: {e}")
+        rotation_matrix = np.eye(3)
     return rotation_matrix
 
 def correct_gaze_vector(gaze_vector, head_rotation):
