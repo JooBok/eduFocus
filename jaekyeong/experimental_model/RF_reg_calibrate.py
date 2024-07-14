@@ -138,7 +138,7 @@ class GazeCalibration:
             except FileNotFoundError:
                 print("No existing model found. Saving new model and new data.")
                 self.model = new_model
-                joblib.dump(self.model, 'gaze_model.pkl')
+                joblib.dump(self.model, 'new_gaze_model.pkl')
                 self.save_data_to_json()
 
             self.is_calibrated = True
