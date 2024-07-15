@@ -163,10 +163,12 @@ class BlinkDetector:
 ### 결과 전송 ###
 AGGREGATOR_URL = "https://result-aggregator-service/aggregate"
 
-def send_result(final_concentration_score, video_id):
+def send_result(final_concentration_score, video_id, ip_address):
     data = {
         "video_id": video_id,
-        "final_concentration_score": final_concentration_score
+        "final_concentration_score": final_concentration_score,
+        "ip_address": ip_address,
+        "model_type": "blink_detection"
     }
     response = requests.post(AGGREGATOR_URL, json=data)
 
@@ -193,22 +195,34 @@ def get_session(session_key):
 ### api 엔드포인트 정의 ###
 @app.route('/process_frame', methods=['POST'])
 def process_frame():
+    # 데이터가 비어 있는지 확인
+    # if not data: 
+    #     return jsonify({"status": "error", "messgae": "Invalid JSON"}), 200
+
+    # 폼 데이터에서 필요한 필드 가져오기
     video_id = request.form['video_id']
+    ip_address = request.form['ip_address']
     frame_number = int(request.form['frame_number'])
-    is_last_frame = request.form['last_frame'].lower() == 'true'
+    is_last_frame = request.form.get('last_frame', 'false').lower() == 'true'
 
-    ip_address = request.remote_addr
+    # 필수 데이터가 없는 경우 에러 반환
+    if not video_id or frame_number is None:
+        return jsonify({"status": "error", "message": "Missing data"}), 400
+
+    # 파일 데이터에서 프레임 가져오기
+    frame_data = request.form['frame']
+    nparr = np.frombuffer(frame_data.encode(), np.uint8)
+    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
+    # 세션 키 생성
     session_key = f"{ip_address}_{video_id}"
-
-    session = get_session[session_key]
+    session = get_session(session_key)
 
     if not is_last_frame:
-        frmae_file = request.files['frame']
-        frame_data = frmae_file.read()
-        frame = np.frombuffer(frame_data, np.uint8)
-        frame = cv2.imdecode(frame, cv2.IMREAD_COLOR)
+        print("Processing frame...")
 
         # 깜빡임 감지
+
         left_ear, right_ear, blink_count, concentration, face_landmarks = session.blink_detector.detect_blink(frame)
     
         # 집중도 데이터 업데이트
@@ -221,6 +235,7 @@ def process_frame():
         return jsonify({"status": "success", "message": "Frame processed"}), 200
 
     else:
+        print("Processing last frame...")
         # 최종 집중도 계산 및 출력
         session.end_frame = frame_number
         if session.frame_count > 0:
@@ -239,12 +254,14 @@ def process_frame():
         final_concentration_score = np.mean(concentration_scores)
 
         # 최종 결과 전송
-        send_result(final_concentration_score, video_id)
+        send_result(final_concentration_score, video_id, ip_address)
         del sessions[session_key]
         return jsonify({"status": "success", "message": "Video processing completed", "final_concentration_score": final_concentration_score}), 200
     
     return jsonify({"status": "success", "message": "Frame processed"}), 200
 
 
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+ 
