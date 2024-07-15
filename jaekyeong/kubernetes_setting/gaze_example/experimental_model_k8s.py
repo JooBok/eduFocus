@@ -29,18 +29,18 @@ face_mesh = mp_face_mesh.FaceMesh(
 )
 mp_drawing = mp.solutions.drawing_utils
 ################################## model setting ##################################
-global model
-model = None
+global model_x, model_y
+model_x = None
+model_y = None
 model_lock = Lock()
 
 def load_models():
-    global model
+    global model_x, model_y
     with model_lock:
-        if model is None:
-            model = joblib.load('/app/model/gaze_model.pkl')
+        if model_x is None or model_y is None:
+            model_x, model_y = joblib.load('/app/model/new_gaze_model.pkl')
 
 load_models()
-
 ################################## Mongo setting ##################################
 def mongodb_client():
     return MongoClient(MONGO_URI)
@@ -58,9 +58,11 @@ def extract_saliencyMap(video_id):
         raise ValueError(f"Error occurred {video_id}")
 ################################# calc Class, def #################################
 class GazeBuffer:
-    def __init__(self, buffer_size=3):
+    def __init__(self, buffer_size=3, smoothing_factor=0.3):
         self.buffer = []
         self.buffer_size = buffer_size
+        self.smoothing_factor = smoothing_factor
+        self.previous_gaze = None
 
     def add(self, gaze):
         self.buffer.append(gaze)
@@ -70,7 +72,16 @@ class GazeBuffer:
     def get_average(self):
         if not self.buffer:
             return None
-        return np.mean(self.buffer, axis=0)
+        
+        current_average = np.mean(self.buffer, axis=0)
+        
+        if self.previous_gaze is None:
+            self.previous_gaze = current_average
+        else:
+            current_average = (1 - self.smoothing_factor) * current_average + self.smoothing_factor * self.previous_gaze
+            self.previous_gaze = current_average
+        
+        return current_average
 
 class GazeFixation:
     def __init__(self, velocity_threshold=0.1, duration=0.2, window_size=6):
@@ -204,7 +215,7 @@ def calc(final_result, saliency_map):
     total_frames = len(final_result)
     for frame_num, gaze_point in final_result.items():
         x, y = gaze_point
-        if saliency_map[frame_num][y][x] > 0.7:
+        if saliency_map[frame_num][y][x] >= 0.7:
             count += 1
     res = count / total_frames
     return res
@@ -243,12 +254,15 @@ def process_frame():
         if result:
             session.final_result[frame_num] = result['gaze_point']
         
+        redis_client.set(session_key, pickle.dumps(session.to_dict()))        
         return jsonify({"status": "success", "message": "Frame processed"}), 200
 
     else:
         saliency_map = extract_saliencyMap(video_id)
         final_res = calc(session.final_result, saliency_map)
         send_result(final_res, video_id, ip_address)
+        
+        redis_client.delete(session_key)
         return jsonify({"status": "success", "message": "Video processing completed"}), 200
 
 def process_single_frame(frame, session):
@@ -286,9 +300,11 @@ def process_single_frame(frame, session):
             if len(session.gaze_sequence) == session.sequence_length:
                 gaze_input = np.array(session.gaze_sequence).flatten().reshape(1, -1)
                 with model_lock:
-                    predicted_gaze = model.predict(gaze_input)[0]
+                    predicted_x = model_x.predict(gaze_input)[0]
+                    predicted_y = model_y.predict(gaze_input)[0]
+                predicted_gaze = np.array([predicted_x, predicted_y])
 
-                session.gaze_buffer.add(np.array(predicted_gaze))
+                session.gaze_buffer.add(predicted_gaze)
                 smoothed_gaze = session.gaze_buffer.get_average()
 
                 filtered_gaze = filter_sudden_changes(smoothed_gaze, session.prev_gaze)
