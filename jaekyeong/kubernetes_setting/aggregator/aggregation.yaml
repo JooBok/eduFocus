@@ -14,7 +14,10 @@ spec:
     spec:
       containers:
       - name: result-aggregator
-        image: pepi10/aggr-test:latest
+        image: pepi10/result-aggregator:test8
+        volumeMounts:
+        - name: tmp-storage
+          mountPath: /tmp/storage
         env:
         - name: MINIO_ENDPOINT
           value: "minio-service:9000"
@@ -30,6 +33,9 @@ spec:
               key: secret-key
         - name: MINIO_SECURE
           value: "false"
+      volumes:
+      - name: tmp-storage
+        emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
@@ -42,3 +48,4 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 5000
+  type: LoadBalancer
