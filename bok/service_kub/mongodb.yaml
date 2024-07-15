@@ -28,7 +28,7 @@ spec:
             configMapKeyRef:
               name: app-config
               key: MONGODB_PASSWORD
-      ## pv.yaml 실행시 
+      # # pv.yaml 실행시 
       #   volumeMounts:
       #   - name: mongodb-storage
       #     mountPath: /data/db  # MongoDB의 기본 데이터 저장 경로

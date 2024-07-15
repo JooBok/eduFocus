@@ -1,0 +1,93 @@
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: pvc-data
+#   namespace: default
+# spec:
+#   storageClassName: mongodata
+#   volumeMode: Filesystem
+#   accessModes:
+#     - ReadWriteOnce
+#   resources:
+#     requests:
+#       storage: 5Gi
+
+#################################
+
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: mongodb-pvc
+# spec:
+#   accessModes:
+#     - ReadWriteOnce
+#   resources:
+#     requests:
+#       storage: 5Gi
+#   storageClassName: mongodb-storage
+#   selector:
+#     matchLabels:
+#       app: my-app
+#       type: mongodb
+# ---
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: application-pvc
+# spec:
+#   accessModes:
+#     - ReadWriteOnce
+#   resources:
+#     requests:
+#       storage: 1Gi
+#   storageClassName: application-storage
+#   selector:
+#     matchLabels:
+#       app: my-app
+#       type: application
+# ---
+# apiVersion: v1
+# kind: PersistentVolumeClaim
+# metadata:
+#   name: contents-pvc
+# spec:
+#   accessModes:
+#     - ReadWriteOnce
+#   resources:
+#     requests:
+#       storage: 4Gi
+#   storageClassName: contents-storage
+#   selector:
+#     matchLabels:
+#       app: my-app
+#       type: contents
+
+#############################
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: application-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  selector:
+    matchLabels:
+      name: application-pv
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: contents-pvc
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 10Gi
+  selector:
+    matchLabels:
+      name: contents-pv

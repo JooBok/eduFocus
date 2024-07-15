@@ -19,5 +19,8 @@ RUN pip install -r /app/requirements.txt
 # 앱 소스 코드 복사
 COPY ./application /app
 
-# # 애플리케이션 실행 명령
-# CMD ["python3", "/app/main.py"]
+# .env 파일 복사
+COPY .env /app/.env
+
+# 애플리케이션 실행 명령
+CMD ["python3", "main.py"]

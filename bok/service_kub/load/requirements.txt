@@ -1,0 +1,5 @@
+numpy
+opencv-python-headless
+pymongo
+python-dotenv
+gridfs
