@@ -38,7 +38,7 @@ def load_models():
     global model_x, model_y
     with model_lock:
         if model_x is None or model_y is None:
-            model_x, model_y = joblib.load('/app/model/new_gaze_model.pkl')
+            model_x, model_y = joblib.load('/app/model/gaze_model.pkl')
 
 load_models()
 ################################## Mongo setting ##################################
