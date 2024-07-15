@@ -210,8 +210,9 @@ def process_frame():
         return jsonify({"status": "error", "message": "Missing data"}), 400
 
     # 파일 데이터에서 프레임 가져오기
-    frame_data = request.form['frame']
-    nparr = np.frombuffer(frame_data.encode(), np.uint8)
+    frame_file = request.files['frame']
+    frame_data = frame_file.read()
+    nparr = np.frombuffer(frame_data, np.uint8)
     frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
     # 세션 키 생성
@@ -263,5 +264,5 @@ def process_frame():
 
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)
  
