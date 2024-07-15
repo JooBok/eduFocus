@@ -102,7 +102,7 @@ def aggregate():
             logger.error(f"Failed to save data locally: {str(e)}")
             return jsonify({"status": "error", "message": f"Failed to save data locally: {str(e)}"}), 500
 
-        ### Classification model 데이터 전송 ###
+        ### Classification model 데이터 전송 (주석 처리됨) ###
         # try:
         #     response = requests.post(CLASSIFICATION_MODEL_URL, json=data_store[ip_address][video_id])
         #     logger.info(f"Successfully sent data to classification model. Response: {response.text}")
@@ -113,7 +113,7 @@ def aggregate():
         ### 데이터 처리 완료 후 저장소에서 제거 ###
         redis_client.delete(redis_key)
         
-        return jsonify({"status": "success", "message": "Data aggregated and sent to classification model"}), 200
+        return jsonify({"status": "success", "message": "Data aggregated and stored in MinIO"}), 200
     
     return jsonify({"status": "success", "message": "Data received"}), 200
 

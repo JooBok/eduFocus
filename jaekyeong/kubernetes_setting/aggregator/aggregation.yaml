@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -14,7 +15,7 @@ spec:
     spec:
       containers:
       - name: result-aggregator
-        image: pepi10/result-aggregator:test8
+        image: pepi10/result-aggregator:latest
         volumeMounts:
         - name: tmp-storage
           mountPath: /tmp/storage
