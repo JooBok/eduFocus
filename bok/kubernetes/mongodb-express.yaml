@@ -28,23 +28,16 @@ spec:
             secretKeyRef:
               name: mongodb-secret
               key: MONGODB_PASSWORD
-        - name: MONGODB_USERNAME
+        - name: ME_CONFIG_MONGODB_URL
           valueFrom:
-            secretKeyRef:
-              name: mongodb-secret
-              key: MONGODB_USERNAME
-        - name: MONGODB_PASSWORD
-          valueFrom:
-            secretKeyRef:
-              name: mongodb-secret
-              key: MONGODB_PASSWORD
+            configMapKeyRef:
+              name: mongo-express-config
+              key: ME_CONFIG_MONGODB_URL
         - name: MONGODB_DB
           valueFrom:
             secretKeyRef:
               name: mongodb-secret
               key: MONGODB_DB
-        - name: ME_CONFIG_MONGODB_URL
-          value: mongodb://$(MONGODB_USERNAME):$(MONGODB_PASSWORD)@mongodb:27017/$(MONGODB_DB)?authSource=admin
         - name: ME_CONFIG_BASICAUTH_USERNAME
           valueFrom:
             secretKeyRef:

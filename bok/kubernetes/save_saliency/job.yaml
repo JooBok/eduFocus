@@ -1,0 +1,24 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: saliency-job
+spec:
+  template:
+    spec:
+      containers:
+      - name: saliency
+        image: joobok/saliency-map:latest
+        volumeMounts:
+        - name: contents
+          mountPath: /app/contents
+        - name: saliency-contents
+          mountPath: /app/saliency_contents
+      restartPolicy: Never
+      volumes:
+      - name: contents
+        hostPath:
+          path: /home/bok/eduFocus/bok/kubernetes/save_saliency/contents
+      - name: saliency-contents
+        hostPath:
+          path: /home/bok/eduFocus/bok/kubernetes/save_saliency/saliency_contents
+  backoffLimit: 4
