@@ -5,3 +5,5 @@
 minikube start --memory=10240 --cpus=8
 
 minikube kubectl -- get pods -A
+
+minikube tunnel &> /dev/null &
