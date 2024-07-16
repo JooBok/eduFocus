@@ -193,8 +193,8 @@ def get_session(session_key):
     return sessions[session_key]
 
 ### api 엔드포인트 정의 ###
-@app.route('/process_frame', methods=['POST'])
-def process_frame():
+@app.route('/blink', methods=['POST'])
+def blink():
     # 데이터가 비어 있는지 확인
     # if not data: 
     #     return jsonify({"status": "error", "messgae": "Invalid JSON"}), 200

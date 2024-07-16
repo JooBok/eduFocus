@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: blink-detection
-        image: IMAGE
+        image: soooohyeon/blink-detector:latest
         ports:
         - containerPort: 5000
         env:
@@ -32,3 +32,4 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 5000
+  type: LoadBalancer
