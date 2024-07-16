@@ -94,6 +94,7 @@ spec:
   nfs:
     server: 172.28.42.75  # 로컬 네트워크에서 할당된 IP 주소
     path: /home/bok/eduFocus/bok/service_kub/application
+  storageClassName: application-storage
 ---
 apiVersion: v1
 kind: PersistentVolume
@@ -109,3 +110,4 @@ spec:
   nfs:
     server: 172.28.42.75  # 로컬 네트워크에서 할당된 IP 주소
     path: /home/bok/eduFocus/bok/service_kub/contents
+  storageClassName: contents-storage
