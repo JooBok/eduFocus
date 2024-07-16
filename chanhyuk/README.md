@@ -12,4 +12,4 @@ Apache Kafka 로컬에서 실행
 
 ><h2>리눅스로 Kafka 설치하는 법</h2>
 >설치된 wsl 실행 또는 Powershell 실행 후</br>
->[원하는 버전의 다운로드 링크 주소 복사 후]([https://img1.daumcdn.net/thumb/R1280x0/scode=mtistory2&fname=https%3A%2F%2Fblog.kakaocdn.net%2Fdn%2Fp0gEy%2FbtsGkTFci1g%2FTbl4mqtaDBPONYhkr0jhm1%2Fimg.png](https://img1.daumcdn.net/thumb/R1280x0/?scode=mtistory2&fname=https%3A%2F%2Fblog.kakaocdn.net%2Fdn%2Fp0gEy%2FbtsGkTFci1g%2FTbl4mqtaDBPONYhkr0jhm1%2Fimg.png))</br>
+>[원하는 버전의 다운로드 링크 주소 복사 후](https://img1.daumcdn.net/thumb/R1280x0/?scode=mtistory2&fname=https%3A%2F%2Fblog.kakaocdn.net%2Fdn%2Fp0gEy%2FbtsGkTFci1g%2FTbl4mqtaDBPONYhkr0jhm1%2Fimg.png)</br>
