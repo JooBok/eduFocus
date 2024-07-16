@@ -14,10 +14,6 @@
 - `concentration_measurement_video.py`: 비디오 파일에서 집중도를 측정하는 파일.
 - 'version_1.py'
 
-├── 
-
-├── 
-
 
 
 
