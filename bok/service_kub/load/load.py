@@ -43,3 +43,6 @@ if __name__ == '__main__':
     if saliency_map_binary and img_size:
         img_height, img_width = img_size
         saliency_map = np.frombuffer(saliency_map_binary, dtype=np.float32).reshape((img_height, img_width))
+        print(f'contents: {collection_name}\n frame: {filename}\n{saliency_map}')
+    else:
+        print("Failed to load saliency map.")
