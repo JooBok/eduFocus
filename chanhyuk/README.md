@@ -19,8 +19,8 @@ https://kafka.apache.org/downloads</br>
 
 ><h2>실행법</h2>
 압축 해제된 폴더로 이동</br>
-`./bin/zookeeper-server-start.sh ./config/zookeeper.properties` 입력해서 zookeeper 실행</br>
-`./bin/kafka-server-start.sh ./config/server.properties` 입력해서 브로커(서버) 실행</br>
-각각 다른 wsl로 실행. 즉, 2개의 wsl에 각각 zookeeper, 브로커 실행</br>
-다시 wsl실행해서 `bin/kafka-topics.sh --create --topic video_stream --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+-`./bin/zookeeper-server-start.sh ./config/zookeeper.properties` 입력해서 zookeeper 실행</br>
+-`./bin/kafka-server-start.sh ./config/server.properties` 입력해서 브로커(서버) 실행</br>
+-각각 다른 wsl로 실행. 즉, 2개의 wsl에 각각 zookeeper, 브로커 실행</br>
+-다시 wsl실행해서 `bin/kafka-topics.sh --create --topic video_stream --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 ` 실행해서 video-stream이라는 topic 생성.</br>
