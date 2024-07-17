@@ -19,4 +19,6 @@ https://kafka.apache.org/downloads</br>
 
 ><h2>실행법</h2>
 압축 해제된 폴더로 이동</br>
-`./bin/zookeeper-server-start.sh ./config/zookeeper.properties` 입력해서 zookeepr 실행
+`./bin/zookeeper-server-start.sh ./config/zookeeper.properties` 입력해서 zookeeper 실행</br>
+`./bin/kafka-server-start.sh ./config/server.properties` 입력해서 브로커(서버) 실행</br>
+각각 다른 wsl 또는 powershell로 실행. 즉, 2개의 wsl 또는 Powershell에 각각 zookeeper, 브로커 실행</br>
