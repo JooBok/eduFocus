@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from analysis_server import analysis
-import cv2, requests
+import cv2, requests, base64
 import numpy as np
 import redis, pickle
 
@@ -53,19 +53,21 @@ def send_result(final_result, video_id, ip_address):
 
 @app.route('/emotion', methods=['POST'])
 def analyze_frame():
-    video_id = request.form['video_id']
-    frame_num = int(request.form['frame_number'])
-    last_frame = request.form['last_frame'].lower() == 'true'
-    ip_address = request.form['ip_address']
+    data = request.json
+
+    video_id = data['video_id']
+    frame_num = data['frame_number']
+    last_frame = data['last_frame']
+    ip_address = data['ip_address']
 
     session_key = f"{ip_address}_{video_id}"
 
     session = get_session(session_key)
 
     if not last_frame:
-        frame_file = request.form['frame']
-        frame_data = frame_file.read()
-        nparr = np.frombuffer(frame_data, np.uint8)
+        frame_file = data['frame']
+        frame_file = base64.b64decode(frame_file)
+        nparr = np.frombuffer(frame_file, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
         result = ana.detect_face(frame)

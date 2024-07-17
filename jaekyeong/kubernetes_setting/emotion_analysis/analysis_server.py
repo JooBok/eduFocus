@@ -88,6 +88,7 @@ class analysis:
 # Main function for analysis
 
     def detect_face(self, frame):
+        ci = None
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         font = cv2.FONT_HERSHEY_SIMPLEX
         faces = self.detector(gray)
