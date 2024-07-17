@@ -3,7 +3,6 @@ import mediapipe as mp
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf.symbol_database")
 import numpy as np
-import pandas as pd
 
 from sklearn.model_selection import GridSearchCV
 from sklearn.ensemble import GradientBoostingRegressor
