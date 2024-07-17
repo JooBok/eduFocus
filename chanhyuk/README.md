@@ -22,5 +22,20 @@ https://kafka.apache.org/downloads</br>
 - `./bin/zookeeper-server-start.sh ./config/zookeeper.properties` 입력해서 zookeeper 실행</br>
 - `./bin/kafka-server-start.sh ./config/server.properties` 입력해서 브로커(서버) 실행</br>
 - 각각 다른 wsl로 실행. 즉, 2개의 wsl에 각각 zookeeper, 브로커 실행</br>
-- 다시 wsl실행해서 `bin/kafka-topics.sh --create --topic video_stream --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+- 다시 wsl실행해서 `./bin/kafka-topics.sh --create --topic video_stream --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 ` 실행해서 video-stream이라는 topic 생성.</br>
+- Producer_ipwebcam.py 코드 실행
+- Powershell 에서 api 호출시에는 ``` $headers = @{
+     "Content-Type" = "application/json"
+ }
+ $body = @{
+     video_id = "원하는 video_id 지정"
+     max_frames = 원하는 최종프레임값 지정(초당 20프레임 데이터 전송 구성됨)
+     ip_address = "10.41.0.154(ipwebcam애플리케이션 ip주소)" 
+ } | ConvertTo-Json
+ Invoke-RestMethod -Uri http://localhost:5000/start_stream -Method Post -Headers $headers -Body $body  ```</br>
+
+ 
+ 원하는 값을 할당 후에 실행하시고 Consumer_ipwebcam.py 실행하면 Kafka 동작함.
+ 
+------
