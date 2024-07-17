@@ -39,3 +39,13 @@ https://kafka.apache.org/downloads</br>
  원하는 값을 할당 후에 실행하시고 Consumer_ipwebcam.py 실행하면 Kafka 동작함.
  
 ------
+만약 실행이 되지 않는다면
+
+
+wsl 에서 `vim ./config/server.properties` 실행해서 변수를 직접 설정해야함.
+
+또는 직접 경로에 있는 파일을 클릭해서 수정하는 방법도 있음.
+
+주석으로 처리되어 있는 **listeners=PLAINTEXT://** 을 listeners=PLAINTEXT://0.0.0.0:9092 로 수정
+
+**num.partitions**를 num.partitions=1로 수정
