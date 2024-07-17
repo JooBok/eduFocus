@@ -3,4 +3,6 @@ kind: ConfigMap
 metadata:
   name: mongo-express-config
 data:
-  ME_CONFIG_MONGODB_URL: mongodb://root:root@mongodb:27017/saliency_db?authSource=admin
+  ME_CONFIG_MONGODB_SERVER: "mongodb"
+  ME_CONFIG_MONGODB_PORT: "27017"
+  ME_CONFIG_MONGODB_URL: "mongodb://root:root@mongodb:27017/saliency_db?authSource=admin"
