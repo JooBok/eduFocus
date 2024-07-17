@@ -1,14 +1,19 @@
 <h1>Apache Kafka 로컬에서 실행</h1>
-선행 조건 : 태블릿pc 또는 모바일 기기에 ipwebcam apk 다운로드
+선행 조건 : 태블릿pc 또는 모바일 기기에 ipwebcam apk 다운로드, 리눅스 설치
 
-앱이 백그라운드에서 실행 가능하도록 설정.
+
+apk 설치 후 앱이 백그라운드에서 실행 가능하도록 설정.
 
 ![99999999999999999999](https://github.com/user-attachments/assets/03403095-1f93-4abc-9fc6-f5342014c6e8)
 
 이 부분 확인해서 apk의 로컬 주소 확인
- 리눅스 설치가 우선되어야 함.</br>
- Windows에서 cmd와 Powershell을 관리자 권한으로 실행.</br>
-` wsl --install Ubuntu-22.04` 입력 (본 프로젝트에서는 22.04.4 버전을 사용)</br>
+</br>
+</br>
+
+리눅스 설치 방법 
+  
+ - Windows에서 cmd와 Powershell을 관리자 권한으로 실행.</br>
+- ` wsl --install Ubuntu-22.04` 입력 (본 프로젝트에서는 22.04.4 버전을 사용)</br>
 
 --------------------------
 
