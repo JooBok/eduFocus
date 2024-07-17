@@ -15,7 +15,7 @@ https://kafka.apache.org/downloads</br>
 원하는 버전의 다운로드 링크 주소 복사 후</br>
 ![0000](https://github.com/user-attachments/assets/0324ad39-7ce8-48d2-8bfb-1154f39c133c)</br>
  `wget https://downloads.apache.org/kafka/3.7.0/kafka_2.13-3.7.0.tgz` 실행해서 다운로드</br>
- `tar xzvf kafka_2.12-3.7.0.tgz` 실행해서 압출 해제</br> 
+ `tar xzvf kafka_2.12-3.7.0.tgz` 실행해서 압축 해제</br> 
 
 ><h2>실행법</h2>
 압축 해제된 폴더로 이동</br>
