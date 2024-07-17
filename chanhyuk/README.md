@@ -6,12 +6,11 @@
 ![99999999999999999999](https://github.com/user-attachments/assets/03403095-1f93-4abc-9fc6-f5342014c6e8)
 
 이 부분 확인해서 apk의 로컬 주소 확인
-
----------------------------------------------------
  리눅스 설치가 우선되어야 함.</br>
  Windows에서 cmd와 Powershell을 관리자 권한으로 실행.</br>
 ` wsl --install Ubuntu-22.04` 입력 (본 프로젝트에서는 22.04.4 버전을 사용)</br>
 
+--------------------------
 
 ><h2>Apahce Kafka 설치</br>
 https://kafka.apache.org/downloads</br>
