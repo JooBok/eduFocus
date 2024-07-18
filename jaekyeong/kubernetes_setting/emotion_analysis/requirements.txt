@@ -3,7 +3,7 @@ tensorflow==1.12.0
 h5py==2.7.0 
 opencv-python==3.4.0.12
 flask==2.0.3
-numpy==1.19.5
+numpy==1.16.4
 scipy==1.5.4 
 matplotlib 
 scikit-learn 

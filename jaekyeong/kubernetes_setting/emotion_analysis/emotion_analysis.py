@@ -1,11 +1,14 @@
 from flask import Flask, request, jsonify
 from analysis_server import analysis
-import cv2, requests, base64
+import cv2, requests, base64, logging
 import numpy as np
 import redis, pickle
 
 app = Flask(__name__)
 ana = analysis()
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 #################################### Session ##################################
@@ -74,7 +77,8 @@ def analyze_frame():
 
         if result:
             session.final_result[frame_num] = result
-            
+        
+        logging.info(f"{ip_address} {video_id} run succeed")
         return jsonify({"status": "success", "message": "Frame processed"}), 200
     else:
         final_res = calc(session.final_result)
