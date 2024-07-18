@@ -27,7 +27,7 @@
 
 ### 집중도 계산 공식
 <p align="center">
-<img width="50%" alt="스크린샷 2024-07-05 103941" src="https://github.com/user-attachments/assets/d0cea5da-f5da-4a6d-9089-f73c29f60119"> 
+<img width="30%" alt="스크린샷 2024-07-05 103941" src="https://github.com/user-attachments/assets/d0cea5da-f5da-4a6d-9089-f73c29f60119"> 
 </p>
 
 ### 집중 점수 계산 공식
