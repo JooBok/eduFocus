@@ -19,7 +19,7 @@ apk 설치 후 앱이 백그라운드에서 실행 가능하도록 설정.
 
 ><h2>Apahce Kafka 설치</br>
 https://kafka.apache.org/downloads</br>
-3.7.0 Scala 2.13 버전 설치</br>
+3.7.0, Scala 2.13 버전 설치</br>
 압축 해제</br>
 
 ><h2>리눅스로 Kafka 설치하는 법</h2>
