@@ -1,5 +1,5 @@
 import time, json, bson, joblib
-import requests, base64, cv2
+import requests, base64, cv2, logging
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf.symbol_database")
 
@@ -13,6 +13,8 @@ from pymongo import MongoClient
 import redis, pickle
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 redis_client = redis.Redis(host='redis-service', port=6379, db=0)
 AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
@@ -274,10 +276,12 @@ def process_frame():
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
         result = process_single_frame(frame, session)
+
+        logging.info(f"\n=========================\n{result}\n=========================")
         
         if result:
             session.final_result[frame_num] = result['gaze_point']
-        
+
         redis_client.set(session_key, pickle.dumps(session.to_dict()))        
         return jsonify({"status": "success", "message": "Frame processed"}), 200
 
@@ -286,7 +290,7 @@ def process_frame():
         saliency_map = extract_saliencyMap(video_id, frame_num)
         final_res = calc(session.final_result, saliency_map)
         send_result(final_res, video_id, ip_address)
-        
+
         redis_client.delete(session_key)
         return jsonify({"status": "success", "message": "Video processing completed"}), 200
 
@@ -328,6 +332,7 @@ def process_single_frame(frame, session):
                     predicted_x = model_x.predict(gaze_input)[0]
                     predicted_y = model_y.predict(gaze_input)[0]
                 predicted_gaze = np.array([predicted_x, predicted_y])
+                logger.info(f"\n===================\n{predicted_gaze}\n===================")
 
                 session.gaze_buffer.add(predicted_gaze)
                 smoothed_gaze = session.gaze_buffer.get_average()
@@ -339,7 +344,7 @@ def process_single_frame(frame, session):
 
                 screen_x = int((predicted_x + 1) * w / 2)
                 screen_y = int((1 - predicted_y) * h / 2)
-
+                
                 screen_x, screen_y = limit_gaze(screen_x, screen_y, w, h)
                 screen_x, screen_y = int(screen_x), int(screen_y)
 
