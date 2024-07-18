@@ -48,37 +48,24 @@ load_models()
 def mongodb_client():
     return MongoClient(MONGO_URI)
 
-def load_bson_chunks_from_db(collection, frame_num):
-    """청크로 나누어진 BSON 데이터를 MongoDB에서 불러와서 결합"""
-    chunks = collection.find({'frame_num': frame_num}).sort('chunk_index')
-    data_encoded = b""
-    for chunk in chunks:
-        data_encoded += chunk['data']
-    return bson.BSON(data_encoded).decode()
-
-def extract_saliencyMap(video_id, frame_num):
+def extract_saliencyMap(video_id):
     client = mongodb_client()
     db = client[MONGO_DB]
-    # collection = db[MONGO_COLLECTION]
     collection = db[video_id]
     
-    # frame_num에 해당하는 첫 번째 문서를 찾음 (청크 또는 단일 문서)
-    first_doc = collection.find_one({'frame_num': frame_num})
-    
-    if first_doc:
-        if 'data' in first_doc:
-            # 청크로 나누어진 데이터일 경우
-            saliency_map_doc = load_bson_chunks_from_db(collection, frame_num)
-        else:
-            # 단일 BSON 데이터일 경우
-            saliency_map_doc = first_doc
+    all_data = collection.find()
+    extracted_data = []
 
-        if 'saliency_map' in saliency_map_doc:
-            return np.array(saliency_map_doc['saliency_map'])
+    for document in all_data:
+        frame_num = document.get('frame_num')
+        saliency_map = document.get('saliency_map')
+        
+        if frame_num is not None and saliency_map is not None:
+            extracted_data.append((frame_num, saliency_map))
         else:
-            raise ValueError(f"Error occurred: 'saliency_map' not found in the document for frame_num {frame_num}")
-    else:
-        raise ValueError(f"Error occurred: frame_num {frame_num} not found")
+            print("Error: 'frame_num' or 'saliency_map' not found in the document")
+
+    return extracted_data
 ################################# calc Class, def #################################
 class GazeBuffer:
     def __init__(self, buffer_size=3, smoothing_factor=0.3):
@@ -287,7 +274,7 @@ def process_frame():
 
     else:
         # saliency_map = extract_saliencyMap(video_id)
-        saliency_map = extract_saliencyMap(video_id, frame_num)
+        saliency_map = extract_saliencyMap(video_id)
         final_res = calc(session.final_result, saliency_map)
         send_result(final_res, video_id, ip_address)
 
