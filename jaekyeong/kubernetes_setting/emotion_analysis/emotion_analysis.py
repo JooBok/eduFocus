@@ -74,7 +74,7 @@ def analyze_frame():
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
         result = ana.detect_face(frame)
-
+        logging.info(f"\n=========================\n{result}\n=========================")
         if result:
             session.final_result[frame_num] = result
         
