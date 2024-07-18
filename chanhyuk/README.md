@@ -6,7 +6,7 @@ apk 설치 후 앱이 백그라운드에서 실행 가능하도록 설정.
 
 ![99999999999999999999](https://github.com/user-attachments/assets/03403095-1f93-4abc-9fc6-f5342014c6e8)
 
-이 부분 확인해서 apk의 로컬 주소 확인
+이 부분 확인해서 apk의 로컬 주소 확인(위 이미지는 예시 이미지임)
 </br>
 </br>
 
@@ -55,11 +55,11 @@ https://kafka.apache.org/downloads</br>
  Invoke-RestMethod -Uri http://localhost:5000/start_stream -Method Post -Headers $headers -Body $body  ```입력</br>
  - 윈도우 CMD에서 api 호출 시에는 `curl -X POST http://localhost:5000/start_stream ^
      -H "Content-Type: application/json" ^
-     -d "{\"video_id\": \"원하는 video_id 지정\", \"max_frames\": 원하는 최종프레임값 지정, \"ip_address\": \"10.41.0.154\"}"
+     -d "{\"video_id\": \"원하는 video_id 지정\", \"max_frames\": 원하는 최종프레임값 지정, \"ip_address\": \"ipwebcam 앱 로컬 주소\"}"
 ` 입력
 
  
- 원하는 값을 할당 후에 실행하시고 Consumer_ipwebcam.py 실행하면 Kafka가 데이터 스트리밍을 수행함.
+ 원하는 값을 할당 후에 호출, Consumer_ipwebcam.py 실행하면 Kafka가 데이터 스트리밍을 수행함.
  
 ------
 만약 실행이 되지 않는다면
