@@ -1,4 +1,4 @@
-import time, json, joblib
+import time, json, bson, joblib
 import requests, base64, cv2
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf.symbol_database")
@@ -20,7 +20,7 @@ AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 # MONGO_URI = 'mongodb://mongodb-service:27017'
 MONGO_URI = 'mongodb://root:root@mongodb:27017/saliency_db?authSource=admin'
 MONGO_DB = 'saliency_db'
-MONGO_COLLECTION = 'contents2'
+# MONGO_COLLECTION = 'contents2'
 ################################ mediaPipe setting ################################
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
@@ -46,27 +46,35 @@ load_models()
 def mongodb_client():
     return MongoClient(MONGO_URI)
 
-# def extract_saliencyMap(video_id):
-#     client = mongodb_client()
-#     db = client[MONGO_DB]
-#     collection = db[MONGO_COLLECTION]
-    
-#     saliency_map_doc = collection.find_one({'video_id': video_id})
-    
-#     if saliency_map_doc:
-#         return np.array(saliency_map_doc['saliency_map'])
-#     else:
-#         raise ValueError(f"Error occurred {video_id}")
-def extract_saliencyMap(frame_num):
+def load_bson_chunks_from_db(collection, frame_num):
+    """청크로 나누어진 BSON 데이터를 MongoDB에서 불러와서 결합"""
+    chunks = collection.find({'frame_num': frame_num}).sort('chunk_index')
+    data_encoded = b""
+    for chunk in chunks:
+        data_encoded += chunk['data']
+    return bson.BSON(data_encoded).decode()
+
+def extract_saliencyMap(video_id, frame_num):
     client = mongodb_client()
     db = client[MONGO_DB]
-    collection = db[MONGO_COLLECTION]
+    # collection = db[MONGO_COLLECTION]
+    collection = db[video_id]
     
-    # frame_num으로 문서를 찾음
-    saliency_map_doc = collection.find_one({'frame_num': frame_num})
+    # frame_num에 해당하는 첫 번째 문서를 찾음 (청크 또는 단일 문서)
+    first_doc = collection.find_one({'frame_num': frame_num})
     
-    if saliency_map_doc:
-        return np.array(saliency_map_doc['saliency_map'])
+    if first_doc:
+        if 'data' in first_doc:
+            # 청크로 나누어진 데이터일 경우
+            saliency_map_doc = load_bson_chunks_from_db(collection, frame_num)
+        else:
+            # 단일 BSON 데이터일 경우
+            saliency_map_doc = first_doc
+
+        if 'saliency_map' in saliency_map_doc:
+            return np.array(saliency_map_doc['saliency_map'])
+        else:
+            raise ValueError(f"Error occurred: 'saliency_map' not found in the document for frame_num {frame_num}")
     else:
         raise ValueError(f"Error occurred: frame_num {frame_num} not found")
 ################################# calc Class, def #################################
@@ -274,7 +282,8 @@ def process_frame():
         return jsonify({"status": "success", "message": "Frame processed"}), 200
 
     else:
-        saliency_map = extract_saliencyMap(video_id)
+        # saliency_map = extract_saliencyMap(video_id)
+        saliency_map = extract_saliencyMap(video_id, frame_num)
         final_res = calc(session.final_result, saliency_map)
         send_result(final_res, video_id, ip_address)
         
