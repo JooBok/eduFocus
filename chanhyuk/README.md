@@ -42,7 +42,7 @@ https://kafka.apache.org/downloads</br>
 - Flask 모듈 다운로드 `pip install Flask==3.0.3` 입력해서 다운로드.
 - cv2 모듈 다운로드 `pip install opencv-python==4.9.0.80` 다운로드.
 - **Python 버전 3.11.5**에서 코드가 작성되고 실행되었음.
-- 
+><h2>실행 - API호출 및 데이터 스트리밍</h2>
 - Producer_ipwebcam.py 코드 실행
 - Powershell 에서 api 호출시에는 ``` $headers = @{
      "Content-Type" = "application/json"
@@ -52,10 +52,14 @@ https://kafka.apache.org/downloads</br>
      max_frames = 원하는 최종프레임값 지정(초당 20프레임 데이터 전송 구성됨)
      ip_address = "10.41.0.154(ipwebcam애플리케이션 ip주소)" 
  } | ConvertTo-Json
- Invoke-RestMethod -Uri http://localhost:5000/start_stream -Method Post -Headers $headers -Body $body  ```</br>
+ Invoke-RestMethod -Uri http://localhost:5000/start_stream -Method Post -Headers $headers -Body $body  ```입력</br>
+ - 윈도우 CMD에서 api 호출 시에는 `curl -X POST http://localhost:5000/start_stream ^
+     -H "Content-Type: application/json" ^
+     -d "{\"video_id\": \"원하는 video_id 지정\", \"max_frames\": 원하는 최종프레임값 지정, \"ip_address\": \"10.41.0.154\"}"
+` 입력
 
  
- 원하는 값을 할당 후에 실행하시고 Consumer_ipwebcam.py 실행하면 Kafka 동작함.
+ 원하는 값을 할당 후에 실행하시고 Consumer_ipwebcam.py 실행하면 Kafka가 데이터 스트리밍을 수행함.
  
 ------
 만약 실행이 되지 않는다면
