@@ -10,7 +10,7 @@ import redis, pickle
 app = Flask(__name__)
 redis_client = redis.Redis(host='redis-service', port=6379, db=2)
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 #####################################################################################################################################
@@ -110,10 +110,12 @@ class BlinkDetector:
         self.total_frames += 1 # 처리된 총 프레임 수 증가
 
         if not results.multi_face_landmarks:
+            logging.debug("No face landmarks detected.")
             return self.last_left_ear, self.last_right_ear, self.blink_count, 0.0, None
         
         
         face_landmarks = results.multi_face_landmarks[0].landmark
+        logging.debug(f"Face landmarks detected: {len(face_landmarks)}")
         
         left_eye = [33, 160, 158, 133, 153, 144]
         right_eye = [362, 385, 387, 263, 373, 380]
@@ -123,6 +125,7 @@ class BlinkDetector:
         
         left_ear = self.calculate_ear(left_eye_landmarks)
         right_ear = self.calculate_ear(right_eye_landmarks)
+        logging.debug(f"Left EAR: {left_ear}, Right EAR: {right_ear}")
 
         e_l = self.calculate_blink_value(left_ear)
         e_r = self.calculate_blink_value(right_ear)
@@ -146,6 +149,7 @@ class BlinkDetector:
 
         # 집중도 계산
         concentration = self.calculate_concentration(e_l, e_r, c_l, c_r, self.total_frames)
+        logging.debug(f"Concentration calculated: {concentration}")
         self.minute_concentration.append(concentration)
 
         if len(self.minute_concentration) >= self.sequence_length:  
@@ -302,9 +306,14 @@ def blink():
         print("Processing frame...")
 
         # 깜빡임 감지
-
         left_ear, right_ear, blink_count, concentration, face_landmarks = session.blink_detector.detect_blink(frame)
-    
+        
+        # 각 변수의 값을 로그로 기록
+        logging.info(f"left_ear: {left_ear}, right_ear: {right_ear}, blink_count: {blink_count}, concentration: {concentration}, face_landmarks: {face_landmarks}")
+
+        # concentration 값을 로그에 기록
+        logging.info(f"====================\nConcentration: {concentration}\n====================")
+        
         # 집중도 데이터 업데이트
         if face_landmarks is not None:
             avg_ear = (left_ear + right_ear) / 2.0
@@ -315,7 +324,7 @@ def blink():
         # 세션 저장
         save_session(session_key, session)
         
-        logging.info(f"{ip_address} {video_id} run succeed")
+        logging.info(f"{ip_address} {video_id} {concentration} run succeed")
 
         return jsonify({"status": "success", "message": "Frame processed"}), 200
 
