@@ -226,8 +226,9 @@ def calc(final_result, saliency_map):
     for frame_num, gaze_point in final_result.items():
         x, y = gaze_point
         for saliency_per_frame in saliency_map:
-            if saliency_per_frame[1][y][x] >= 0.7:
-                count += 1
+            if frame_num == saliency_per_frame[0]:
+                if saliency_per_frame[1][y][x] >= 0.7:
+                    count += 1
     res = count / total_frames
     return res
 
