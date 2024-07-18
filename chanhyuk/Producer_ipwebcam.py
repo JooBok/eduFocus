@@ -4,6 +4,7 @@ import cv2
 import threading
 import logging
 import json
+import base64
 
 app = Flask(__name__)
 
@@ -61,8 +62,10 @@ class StreamThread(threading.Thread):
                     self.cap = cv2.VideoCapture(self.stream_url)
                     continue
 
-                _, buffer = cv2.imencode('.jpg', frame)
+                _, buffer = cv2.imencode('.png', frame)
                 frame_number += 1
+
+                frame_base64 = base64.b64encode(buffer).decode('utf-8')
 
                 # if frame_number > self.max_frames:
                 #     logger.info("Maximum frame limit reached. Stopping stream.")
@@ -75,7 +78,7 @@ class StreamThread(threading.Thread):
                     'video_id': self.video_id,
                     'ip_address': self.ip_address,
                     'frame_number': frame_number,
-                    'frame': buffer.tobytes().hex(),
+                    'frame': frame_base64,
                     'last_frame_state': False
                 }
 
@@ -87,11 +90,13 @@ class StreamThread(threading.Thread):
                     logger.error(f"Failed to send frame {frame_number}: {e}")
 
             # Send end of stream message
+            _, buffer = cv2.imencode('.png',frame)
+            frame_base64 = base64.b64encode(buffer).decode('utf-8')
             end_message = {
                 'video_id': self.video_id,
                 'ip_address': self.ip_address,
                 'frame_number': frame_number,
-                'frame': buffer.tobytes().hex(),
+                'frame': frame_base64,
                 'last_frame_state': True
             }
             producer.send(kafka_topic, end_message)
