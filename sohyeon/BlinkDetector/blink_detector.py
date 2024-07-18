@@ -1,21 +1,23 @@
-import time, json
+import time, json, logging
 import requests, base64, cv2
 import mediapipe as mp
 import numpy as np
 from threading import Lock
 from flask import Flask, request, jsonify
 
-app = Flask(__name__)
+import redis, pickle
 
+app = Flask(__name__)
+redis_client = redis.Redis(host='redis-service', port=6379, db=2)
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+#####################################################################################################################################
 class BlinkDetector:
     def __init__(self, ear_threshold=0.25, consecutive_frames=3,
                  min_detection_confidence=0.7, min_presence_confidence=0.7, min_tracking_confidence=0.7):
-        self.mp_face_mesh = mp.solutions.face_mesh.FaceMesh(
-            max_num_faces=1,
-            refine_landmarks=True,
-            min_detection_confidence=min_detection_confidence,
-            min_tracking_confidence=min_tracking_confidence
-        )
+        self.mp_face_mesh = None # 나중에 초기화
         self.min_detection_confidence = min_detection_confidence
         self.min_presence_confidence = min_presence_confidence
         self.min_tracking_confidence = min_tracking_confidence
@@ -32,7 +34,58 @@ class BlinkDetector:
         self.minute_blinks = 0
         self.minute_concentration = []
         self.max_ear = 0.3  # 초기 최대 EAR 예시 값
+
+    def initialize_mp_face_mesh(self):
+        self.mp_face_mesh = mp.solutions.face_mesh.FaceMesh(
+            max_num_faces=1,
+            refine_landmarks=True,
+            min_detection_confidence=self.min_detection_confidence,
+            min_tracking_confidence=self.min_tracking_confidence
+        )
  
+    def to_dict(self):
+        return {
+            "min_detection_confidence": self.min_detection_confidence,
+            "min_presence_confidence": self.min_presence_confidence,
+            "min_tracking_confidence": self.min_tracking_confidence,
+            "ear_threshold": self.ear_threshold,
+            "consecutive_frames": self.consecutive_frames,
+            "frame_counter": self.frame_counter,
+            "blink_count": self.blink_count,
+            "ear_sequence": self.ear_sequence,
+            "sequence_length": self.sequence_length,
+            "start_frame": self.start_frame,
+            "last_left_ear": self.last_left_ear,
+            "last_right_ear": self.last_right_ear,
+            "total_frames": self.total_frames,
+            "minute_blinks": self.minute_blinks,
+            "minute_concentration": self.minute_concentration,
+            "max_ear": self.max_ear
+        }
+    
+    @staticmethod
+    def from_dict(data):
+        detector = BlinkDetector(
+            ear_threshold=data["ear_threshold"],
+            consecutive_frames=data["consecutive_frames"],
+            min_detection_confidence=data["min_detection_confidence"],
+            min_presence_confidence=data["min_presence_confidence"],
+            min_tracking_confidence=data["min_tracking_confidence"]
+        )
+        detector.frame_counter = data["frame_counter"]
+        detector.blink_count = data["blink_count"]
+        detector.ear_sequence = data["ear_sequence"]
+        detector.sequence_length = data["sequence_length"]
+        detector.start_frame = data["start_frame"]
+        detector.last_left_ear = data["last_left_ear"]
+        detector.last_right_ear = data["last_right_ear"]
+        detector.total_frames = data["total_frames"]
+        detector.minute_blinks = data["minute_blinks"]
+        detector.minute_concentration = data["minute_concentration"]
+        detector.max_ear = data["max_ear"]
+        detector.initialize_mp_face_mesh()
+        return detector
+
     def calculate_ear(self, eye_landmarks):
         eye_landmarks = np.array(eye_landmarks)
         v1 = np.linalg.norm(eye_landmarks[1] - eye_landmarks[5])
@@ -160,7 +213,8 @@ class BlinkDetector:
         
         return weight
     
-### 결과 전송 ###
+
+######################################## 결과 전송 ############################################################
 AGGREGATOR_URL = "https://result-aggregator-service/aggregate"
 
 def send_result(final_concentration_score, video_id, ip_address):
@@ -175,43 +229,68 @@ def send_result(final_concentration_score, video_id, ip_address):
     if response.status_code != 200:
         print(f"Failed to send result: {response.text}")
 
-### 세션 관리 ###
+
+######################################### 세션 관리 #############################################################
 sessions = {}
 
 class Session:
     def __init__(self):
         self.blink_detector = BlinkDetector()
+        self.blink_detector.initialize_mp_face_mesh()
         self.total_concentration = 0
         self.frame_count = 0
         self.start_frame = 0
         self.end_frame = None
         self.total_concentration_scores = []
 
-def get_session(session_key):
-    if session_key not in sessions:
-        sessions[session_key] = Session()
-    return sessions[session_key]
+    def to_dict(self):
+        return {
+            "blink_detector": self.blink_detector.to_dict(),
+            "total_concentration": self.total_concentration,
+            "frame_count": self.frame_count,
+            "start_frame": self.start_frame,
+            "end_frame": self.end_frame,
+            "total_concentration_scores": self.total_concentration_scores,
+        }
 
-### api 엔드포인트 정의 ###
+    @staticmethod
+    def from_dict(data):
+        session = Session()
+        session.blink_detector = BlinkDetector.from_dict(data["blink_detector"])
+        session.total_concentration = data["total_concentration"]
+        session.frame_count = data["frame_count"]
+        session.start_frame = data["start_frame"]
+        session.end_frame = data["end_frame"]
+        session.total_concentration_scores = data["total_concentration_scores"]
+        return session
+
+def get_session(session_key):
+    session_data = redis_client.get(session_key)
+    if session_data:
+        return Session.from_dict(pickle.loads(session_data))
+    return Session()
+
+def save_session(session_key, session):
+    redis_client.set(session_key, pickle.dumps(session.to_dict()))
+    
+######################################### api 엔드포인트 정의 #########################################################
 @app.route('/blink', methods=['POST'])
 def blink():
-    # 데이터가 비어 있는지 확인
-    # if not data: 
-    #     return jsonify({"status": "error", "messgae": "Invalid JSON"}), 200
-
     # 폼 데이터에서 필요한 필드 가져오기
-    video_id = request.form['video_id']
-    ip_address = request.form['ip_address']
-    frame_number = int(request.form['frame_number'])
-    is_last_frame = request.form.get('last_frame', 'false').lower() == 'true'
+    data = request.json
+
+    video_id = data['video_id']
+    ip_address = data['ip_address']
+    frame_number = data['frame_number']
+    is_last_frame = data['last_frame']
 
     # 필수 데이터가 없는 경우 에러 반환
     if not video_id or frame_number is None:
         return jsonify({"status": "error", "message": "Missing data"}), 400
 
     # 파일 데이터에서 프레임 가져오기
-    frame_file = request.files['frame']
-    frame_data = frame_file.read()
+    frame_base64 = data['frame']
+    frame_data = base64.b64decode(frame_base64)
     nparr = np.frombuffer(frame_data, np.uint8)
     frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
@@ -232,6 +311,11 @@ def blink():
             session.total_concentration += concentration
             session.frame_count += 1
             session.total_concentration_scores.append(concentration)
+
+        # 세션 저장
+        save_session(session_key, session)
+        
+        logging.info(f"{ip_address} {video_id} run succeed")
 
         return jsonify({"status": "success", "message": "Frame processed"}), 200
 
@@ -256,7 +340,7 @@ def blink():
 
         # 최종 결과 전송
         send_result(final_concentration_score, video_id, ip_address)
-        del sessions[session_key]
+        redis_client.delete(session_key)
         return jsonify({"status": "success", "message": "Video processing completed", "final_concentration_score": final_concentration_score}), 200
     
     return jsonify({"status": "success", "message": "Frame processed"}), 200
