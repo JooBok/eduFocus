@@ -15,18 +15,27 @@
 - `version_1.py`: 테스트용 초기 버전 스크립트.
 
 
+
 ## 집중도 계산 방법
 
 본 프로젝트에서 집중도를 계산하기 위해 다음과 같은 공식을 사용:
 
+### 집중도 e_c 계산 공식
+<p align="center">
+<img width="70%" alt="스크린샷 2024-07-03 140805" src="https://github.com/user-attachments/assets/dadc09fa-dddb-4c10-b365-db5e8fad616e"> 
+</p>
+
 ### 집중도 계산 공식
-![집중도 계산 공식](./images/스크린샷 2024-07-05 103941.png)
+<p align="center">
+<img width="70%" alt="스크린샷 2024-07-05 103941" src="https://github.com/user-attachments/assets/d0cea5da-f5da-4a6d-9089-f73c29f60119"> 
+</p>
 
 ### 집중 점수 계산 공식
-![집중 점수 계산 공식](./images/스크린샷 2024-07-09 131713.png)
+<p align="center">
+<img width="70%" alt="스크린샷 2024-07-09 131713" src="https://github.com/user-attachments/assets/f3a3c2e0-0c50-4d4e-8f73-d592d87201b6"> 
+</p>
 
-### 집중도 e_c 계산 공식
-![집중도 e_c 계산 공식](./images/스크린샷 2024-07-03 140805.png)
+
 
 
 ### 집중도 계산 설명
