@@ -1,0 +1,12 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+RUN apt-get update \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install pymongo numpy
+
+COPY . .
+
+CMD ["python", "test.py"]
