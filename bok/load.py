@@ -1,39 +1,48 @@
+import bson
 import os
-import json
-import gridfs
-from pymongo import MongoClient
-from dotenv import load_dotenv
 
-# .env 파일 로드
-load_dotenv(dotenv_path='/app/.env')
+output_dir = 'saliency_contents/contents2'  # 청크로 나누어 저장된 BSON 파일들이 있는 디렉터리
 
-# 환경 변수에서 MongoDB 연결 정보 읽기
-username = os.getenv('MONGODB_USERNAME')
-password = os.getenv('MONGODB_PASSWORD')
-host = os.getenv('MONGODB_HOST')
-port = os.getenv('MONGODB_PORT')
-database = os.getenv('MONGODB_DB')
-
-# MongoDB 연결 설정
-client = MongoClient(f'mongodb://{username}:{password}@{host}:{port}/{database}?authSource=admin')
-db = client[database]
-
-def fetch_data_from_collection(collection_name, filename):
-    fs = gridfs.GridFS(db, collection=collection_name)
-    file_data = fs.find_one({'filename': filename})
-    if file_data:
-        saliency_map_json = file_data.read()
-        saliency_map = json.loads(saliency_map_json)
-        return saliency_map
+def load_bson_chunks(base_path):
+    """ 청크로 나누어 저장된 BSON 파일들을 불러와 재구성 """
+    chunks = []
+    i = 0
+    while True:
+        chunk_path = f"{base_path}_chunk_{i}.bson"
+        if not os.path.exists(chunk_path):
+            break
+        with open(chunk_path, 'rb') as f:
+            chunks.append(f.read())
+        i += 1
+    
+    # 청크들을 결합하여 원래의 BSON 데이터로 복원
+    if chunks:
+        return bson.BSON(b''.join(chunks)).decode()
     else:
-        print(f"No data found for filename {filename} in collection {collection_name}")
         return None
 
-# 예시: contents1 컬렉션에서 특정 파일의 데이터를 가져오기
-collection_name = 'contents1'
-filename = 'example_image.jpg'  # 불러오고자 하는 파일 이름
+def load_data_for_frame(frame_number):
+    """ 특정 frame_number에 맞는 데이터를 불러오기 """
+    base_path = os.path.join(output_dir, f'frame_{frame_number}')
+    
+    if os.path.exists(f"{base_path}.bson"):
+        # 단일 파일로 저장된 BSON 불러오기
+        with open(f"{base_path}.bson", 'rb') as f:
+            data = bson.BSON(f.read()).decode()
+    else:
+        # 청크로 나누어 저장된 BSON 불러오기
+        data = load_bson_chunks(base_path)
+    
+    return data
 
-saliency_map = fetch_data_from_collection(collection_name, filename)
-if saliency_map:
-    print(f"Saliency map for {filename} in collection {collection_name}:")
-    print(saliency_map)
+# main
+if __name__ == '__main__':
+    frame_number = int(input("Enter frame number to load: "))  # 사용자로부터 frame_number 입력받기
+
+    data = load_data_for_frame(frame_number)
+    
+    if data is not None:
+        print(f"Loaded data for frame {frame_number}:")
+        print(data)
+    else:
+        print(f"Failed to load data for frame {frame_number}")

@@ -17,9 +17,10 @@ app = Flask(__name__)
 redis_client = redis.Redis(host='redis-service', port=6379, db=0)
 AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 ################################## Mongo setting ##################################
-MONGO_URI = 'mongodb://mongodb-service:27017'
-MONGO_DB = 'database_name'
-MONGO_COLLECTION = 'saliency_map'
+# MONGO_URI = 'mongodb://mongodb-service:27017'
+MONGO_URI = 'mongodb://root:root@mongodb:27017/saliency_db?authSource=admin'
+MONGO_DB = 'saliency_db'
+MONGO_COLLECTION = 'contents2'
 ################################ mediaPipe setting ################################
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
@@ -45,17 +46,29 @@ load_models()
 def mongodb_client():
     return MongoClient(MONGO_URI)
 
-def extract_saliencyMap(video_id):
+# def extract_saliencyMap(video_id):
+#     client = mongodb_client()
+#     db = client[MONGO_DB]
+#     collection = db[MONGO_COLLECTION]
+    
+#     saliency_map_doc = collection.find_one({'video_id': video_id})
+    
+#     if saliency_map_doc:
+#         return np.array(saliency_map_doc['saliency_map'])
+#     else:
+#         raise ValueError(f"Error occurred {video_id}")
+def extract_saliencyMap(frame_num):
     client = mongodb_client()
     db = client[MONGO_DB]
     collection = db[MONGO_COLLECTION]
     
-    saliency_map_doc = collection.find_one({'video_id': video_id})
+    # frame_num으로 문서를 찾음
+    saliency_map_doc = collection.find_one({'frame_num': frame_num})
     
     if saliency_map_doc:
         return np.array(saliency_map_doc['saliency_map'])
     else:
-        raise ValueError(f"Error occurred {video_id}")
+        raise ValueError(f"Error occurred: frame_num {frame_num} not found")
 ################################# calc Class, def #################################
 class GazeBuffer:
     def __init__(self, buffer_size=3, smoothing_factor=0.3):

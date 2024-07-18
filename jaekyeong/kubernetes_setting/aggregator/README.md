@@ -2,7 +2,7 @@
 
 #### Minio
 
-> minio -> k port-forward service/minio-service 9001:9001          
+> minio -> k port-forward service/minio-service 9001:9001 9000:9000          
 > http://127.0.0.1:9001 접속         
 > id = minio        
 > password = minio123          

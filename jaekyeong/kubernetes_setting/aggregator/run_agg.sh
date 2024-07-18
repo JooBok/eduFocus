@@ -5,8 +5,8 @@
 #   --from-literal=access-key=minio-access-key \
 #   --from-literal=secret-key=minio-secret-key
 
-docker build -t pepi10/result-aggregator:latest -f Dockerfile.aggregator
-docker push pepi10/result-aggregator:latest
+# docker build -t pepi10/result-aggregator:latest -f Dockerfile.aggregator
+# docker push pepi10/result-aggregator:latest
 
 ### aggregator 배포 ###
 kubectl apply -f aggregation.yaml
