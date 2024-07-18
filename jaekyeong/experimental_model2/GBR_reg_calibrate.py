@@ -33,11 +33,11 @@ mp_drawing = mp.solutions.drawing_utils
 
 cap = cv2.VideoCapture(0)
 ### $ 해상도 ###
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
 cv2.namedWindow('MediaPipe Iris Gaze Calibration', cv2.WINDOW_NORMAL)
-cv2.resizeWindow('MediaPipe Iris Gaze Calibration', 1280, 720)
+cv2.resizeWindow('MediaPipe Iris Gaze Calibration', 640, 480)
 
 class GazeCalibration:
     def __init__(self, sequence_length = 10):
