@@ -24,7 +24,7 @@
 
 ### 집중도 e_c 계산 공식
 <p align="center">
-<img width="50%" alt="스크린샷 2024-07-03 140805" src="https://github.com/user-attachments/assets/dadc09fa-dddb-4c10-b365-db5e8fad616e"> 
+<img width="40%" alt="스크린샷 2024-07-03 140805" src="https://github.com/user-attachments/assets/dadc09fa-dddb-4c10-b365-db5e8fad616e"> 
 </p>
 
 ### 집중도 계산 공식
