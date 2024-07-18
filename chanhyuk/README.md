@@ -36,6 +36,13 @@ https://kafka.apache.org/downloads</br>
 - 각각 다른 wsl로 실행. 즉, 2개의 wsl에 각각 zookeeper, 브로커 실행</br>
 - 다시 wsl실행해서 `./bin/kafka-topics.sh --create --topic video_stream --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
 ` 실행해서 video-stream이라는 topic 생성.</br>
+><h3>실행 환경</h3>
+- Kafka-python 모듈을 다운로드 터미널에 `pip install kafk-python==1.4.3` 입력해서 다운로드.
+- requests 모듈 다운로드 터미널에 `pip install requests==2.31.0` 입력해서 다운로드.
+- Flask 모듈 다운로드 `pip install Flask==3.0.3` 입력해서 다운로드.
+- cv2 모듈 다운로드 `pip install opencv-python==4.9.0.80` 다운로드.
+- **Python 버전 3.11.5**에서 코드가 작성되고 실행되었음.
+- 
 - Producer_ipwebcam.py 코드 실행
 - Powershell 에서 api 호출시에는 ``` $headers = @{
      "Content-Type" = "application/json"
