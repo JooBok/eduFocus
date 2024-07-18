@@ -61,7 +61,7 @@ def extract_saliencyMap(video_id):
         saliency_map = document.get('saliency_map')
         
         if frame_num is not None and saliency_map is not None:
-            extracted_data.append((frame_num, saliency_map))
+            extracted_data.append([frame_num, saliency_map])
         else:
             print("Error: 'frame_num' or 'saliency_map' not found in the document")
 
@@ -225,8 +225,9 @@ def calc(final_result, saliency_map):
     total_frames = len(final_result)
     for frame_num, gaze_point in final_result.items():
         x, y = gaze_point
-        if saliency_map[frame_num][y][x] >= 0.7:
-            count += 1
+        for saliency_per_frame in saliency_map:
+            if saliency_per_frame[1][y][x] >= 0.7:
+                count += 1
     res = count / total_frames
     return res
 
@@ -276,8 +277,11 @@ def process_frame():
         # saliency_map = extract_saliencyMap(video_id)
         saliency_map = extract_saliencyMap(video_id)
         final_res = calc(session.final_result, saliency_map)
-        send_result(final_res, video_id, ip_address)
+        
+        logging.info(f"\n+++++++++++++++++++\n{final_res}\n+++++++++++++++++++")
 
+        send_result(final_res, video_id, ip_address)
+        
         redis_client.delete(session_key)
         return jsonify({"status": "success", "message": "Video processing completed"}), 200
 
