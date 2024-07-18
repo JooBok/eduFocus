@@ -29,12 +29,12 @@
 
 ### 집중도 계산 공식
 <p align="center">
-<img width="10%" alt="스크린샷 2024-07-05 103941" src="https://github.com/user-attachments/assets/d0cea5da-f5da-4a6d-9089-f73c29f60119"> 
+<img width="15%" alt="스크린샷 2024-07-05 103941" src="https://github.com/user-attachments/assets/d0cea5da-f5da-4a6d-9089-f73c29f60119"> 
 </p>
 
 ### 집중 점수 계산 공식
 <p align="center">
-<img width="20%" alt="스크린샷 2024-07-09 131713" src="https://github.com/user-attachments/assets/f3a3c2e0-0c50-4d4e-8f73-d592d87201b6"> 
+<img width="25%" alt="스크린샷 2024-07-09 131713" src="https://github.com/user-attachments/assets/f3a3c2e0-0c50-4d4e-8f73-d592d87201b6"> 
 </p>
 
 ---
