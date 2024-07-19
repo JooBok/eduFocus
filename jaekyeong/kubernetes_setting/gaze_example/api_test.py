@@ -8,6 +8,11 @@ def encode(path):
     frame_base64 = base64.b64encode(buffer).decode('utf-8')
     return frame_base64
 
+service_list = [
+        'http://192.168.49.2:30659/gaze',
+        'http://192.168.49.2:30250/blink',
+        'http://192.168.49.2:30604/emotion']
+
 for _ in range(26):
     if _ < 10:
         frame_base64 = encode(f'./face_frames/frame_000{_}.png')
@@ -22,21 +27,12 @@ for _ in range(26):
         "frame": frame_base64
     }
 
-    response = requests.post(
-        'http://192.168.49.2:30659/gaze',
-        headers={'Content-Type': 'application/json'},
-        data=json.dumps(data)
-    )
-    response = requests.post(
-        'http://192.168.49.2:30250/blink',
-        headers={'Content-Type': 'application/json'},
-        data=json.dumps(data)
-    )
-    response = requests.post(
-        'http://192.168.49.2:30604/emotion',
-        headers={'Content-Type': 'application/json'},
-        data=json.dumps(data)
-    )
+    for service in service_list:
+        response = requests.post(
+            service,
+            headers={'Content-Type': 'application/json'},
+            data=json.dumps(data)
+        )
 print("##########################################################################")
 
 for _ in range(26, 27):
@@ -50,18 +46,9 @@ for _ in range(26, 27):
         "frame": frame_base64
     }
 
-    response = requests.post(
-        'http://192.168.49.2:30659/gaze',
-        headers={'Content-Type': 'application/json'},
-        data=json.dumps(data)
-    )
-    response = requests.post(
-        'http://192.168.49.2:30250/blink',
-        headers={'Content-Type': 'application/json'},
-        data=json.dumps(data)
-    )
-    response = requests.post(
-        'http://192.168.49.2:30604/emotion',
-        headers={'Content-Type': 'application/json'},
-        data=json.dumps(data)
-    )
+    for service in service_list:
+        response = requests.post(
+            service,
+            headers={'Content-Type': 'application/json'},
+            data=json.dumps(data)
+        )
