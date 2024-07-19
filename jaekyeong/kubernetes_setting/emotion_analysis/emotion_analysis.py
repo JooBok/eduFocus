@@ -34,12 +34,10 @@ def get_session(session_key):
         return Session.from_dict(pickle.loads(session_data))
     return Session()
 ##############################################################################
-def calc(final_result):
-    if not final_result:
-        return 0.0
-    total_frames = len(final_result)
-    c_frames = sum(1 for result in final_result.values() if result == 1)
-    
+def calc(total_frames, final_result):
+    logging.info(f"total_frame: {total_frames}")
+    c_frames = int(sum(1 for result in final_result.values() if result == "1"))
+    logging.info(f"c_frames: {c_frames}")
     res = c_frames / total_frames
     return res
 
@@ -82,8 +80,8 @@ def analyze_frame():
         logging.info(f"{ip_address} {video_id} run succeed")
         return jsonify({"status": "success", "message": "Frame processed"}), 200
     else:
-        final_res = calc(session.final_result)
-        logging.info(f"\n=========================\n{final_res}\n=========================")
+        final_res = calc(frame_num, session.final_result)
+        logging.info(f"\n++++++++++++++++++++++++\n{final_res}\n++++++++++++++++++++++++")
 
         send_result(final_res, video_id, ip_address)
         logging.info(f"\n=========================\nsend emotion data to aggregator\n=========================")
