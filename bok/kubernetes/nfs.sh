@@ -15,12 +15,13 @@ sudo bash -c "echo '$NFS_LOCAL_PATH *(rw,sync,no_subtree_check,no_root_squash)' 
 # 설정 저장 및 재시작
 sudo systemctl start nfs-kernel-server
 sudo systemctl enable nfs-kernel-server
+sudo systemctl restart nfs-kernel-server
 sudo systemctl restart nfs-server
 sudo systemctl status nfs-kernel-server
 
 # NFS 트래픽을 허용하도록 방화벽 설정
-sudo ufw allow frm $MINIKUBE_IP to any port nfs
-sudo ufw allow frm $MINIKUBE_IP to any port 2049
-sudo ufw allow frm $MINIKUBE_IP to any port 111
-sudo ufw allow frm $MINIKUBE_IP to any port 20048
-sudo ufw allow frm $MINIKUBE_IP to any port 875
+sudo ufw allow from $MINIKUBE_IP to any port nfs
+sudo ufw allow from $MINIKUBE_IP to any port 2049
+sudo ufw allow from $MINIKUBE_IP to any port 111
+sudo ufw allow from $MINIKUBE_IP to any port 20048
+sudo ufw allow from $MINIKUBE_IP to any port 875
