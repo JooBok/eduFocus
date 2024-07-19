@@ -19,8 +19,8 @@ sudo systemctl restart nfs-server
 sudo systemctl status nfs-kernel-server
 
 # NFS 트래픽을 허용하도록 방화벽 설정
-sudo ufw allow frm $MINIKUBE_IP to any port nfs
-sudo ufw allow frm $MINIKUBE_IP to any port 2049
-sudo ufw allow frm $MINIKUBE_IP to any port 111
-sudo ufw allow frm $MINIKUBE_IP to any port 20048
-sudo ufw allow frm $MINIKUBE_IP to any port 875
+sudo ufw allow from $MINIKUBE_IP to any port nfs
+sudo ufw allow from $MINIKUBE_IP to any port 2049
+sudo ufw allow from $MINIKUBE_IP to any port 111
+sudo ufw allow from $MINIKUBE_IP to any port 20048
+sudo ufw allow from $MINIKUBE_IP to any port 875
