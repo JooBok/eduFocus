@@ -238,7 +238,8 @@ def send_result(final_result, video_id, ip_address):
     data = {
         "video_id": video_id,
         "final_score": final_result,
-        "ip_address": ip_address
+        "ip_address": ip_address,
+        "model_type": gaze
     }
     response = requests.post(AGGREGATOR_URL, json=data)
 
