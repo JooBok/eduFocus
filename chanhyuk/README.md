@@ -69,4 +69,4 @@ wsl 에서 `vim ./config/server.properties` 실행해서 변수를 직접 설정
 또는 직접 경로에 있는 파일을 클릭해서 수정하는 방법도 있음.</br>
 주석으로 처리되어 있는 **listeners=PLAINTEXT://** 을 listeners=PLAINTEXT://0.0.0.0:9092 로 수정</br>
 **num.partitions**를 num.partitions=1로 수정</br>
-**advertised.listeners=PLAINTEXT:** 를 advertised.listeners=PLAINTEXT://localhost:9092로 수정 만약 이미 되어 있다면 주석 해제만 하면 됨.</br>
+**advertised.listeners=PLAINTEXT:** 를 advertised.listeners=PLAINTEXT://localhost:9092로 수정이 이미 되어 있다면 주석 해제만 하면 됨.</br>
