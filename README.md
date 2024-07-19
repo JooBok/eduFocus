@@ -22,8 +22,6 @@
         <sub><b>전소현</b><br>🙋‍♀️ 모델 구축</sub>
       </a>
     </td>
-  </tr>
-  <tr>
     <td align="center">
       <a href="https://github.com/Pepi10">
         <img src="https://github.com/Pepi10.png" width="150px;" alt="재경"/>
@@ -31,7 +29,6 @@
         <sub><b>김재경</b><br>🙋‍♂️ 모델 구축, 배포</sub>
       </a>
     </td>
-  </tr>
 </table>
 
 ## 준비단계
