@@ -4,7 +4,7 @@ def encode(path):
     print(path)
     frame = cv2.imread(path)
     frame = cv2.resize(frame, (640, 480))
-    __, buffer = cv2.imencode('png', frame)
+    __, buffer = cv2.imencode('.png', frame)
     frame_base64 = base64.b64encode(buffer).decode('utf-8')
     return frame_base64
 
@@ -27,7 +27,16 @@ for _ in range(26):
         headers={'Content-Type': 'application/json'},
         data=json.dumps(data)
     )
-
+    response = requests.post(
+        'http://192.168.49.2:30250/blink',
+        headers={'Content-Type': 'application/json'},
+        data=json.dumps(data)
+    )
+    response = requests.post(
+        'http://192.168.49.2:30604/emotion',
+        headers={'Content-Type': 'application/json'},
+        data=json.dumps(data)
+    )
 print("##########################################################################")
 
 for _ in range(26, 27):
@@ -43,6 +52,16 @@ for _ in range(26, 27):
 
     response = requests.post(
         'http://192.168.49.2:30659/gaze',
+        headers={'Content-Type': 'application/json'},
+        data=json.dumps(data)
+    )
+    response = requests.post(
+        'http://192.168.49.2:30250/blink',
+        headers={'Content-Type': 'application/json'},
+        data=json.dumps(data)
+    )
+    response = requests.post(
+        'http://192.168.49.2:30604/emotion',
         headers={'Content-Type': 'application/json'},
         data=json.dumps(data)
     )
