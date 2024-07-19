@@ -62,7 +62,7 @@ https://kafka.apache.org/downloads</br>
  원하는 값을 할당 후에 호출, Consumer_ipwebcam.py 실행하면 Kafka가 데이터 스트리밍을 수행함.
  
 ------
-만약 실행이 되지 않는다면
+<h2>⚠️만약 실행이 되지 않는다면⚠️</h2>
 
 
 wsl 에서 `vim ./config/server.properties` 실행해서 변수를 직접 설정해야함.</br>
