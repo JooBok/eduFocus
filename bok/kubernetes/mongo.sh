@@ -18,5 +18,5 @@ db.createCollection("$CONTENTS_NAME")
 exit
 EOF
 
-# 컬렉션에 데이터 넣기
+### 컬렉션에 데이터 넣기 (수정 필요) 
 kubectl exec -it $MONGODB_POD -- bash -c "for FILE in /data/db/contents2/frame_*.bson; do mongorestore --db=saliency_db --collection=contents2 ${FILE}; done"
