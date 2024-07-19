@@ -219,7 +219,7 @@ class BlinkDetector:
     
 
 ######################################## 결과 전송 ############################################################
-AGGREGATOR_URL = "https://result-aggregator-service/aggregate"
+AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 
 def send_result(final_concentration_score, video_id, ip_address):
     data = {
