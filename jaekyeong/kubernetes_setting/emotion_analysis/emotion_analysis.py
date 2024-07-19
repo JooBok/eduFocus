@@ -34,13 +34,15 @@ def get_session(session_key):
         return Session.from_dict(pickle.loads(session_data))
     return Session()
 ##############################################################################
-def calc(final_result):
-    if not final_result:
-        return 0.0
-    total_frames = len(final_result)
-    c_frames = sum(1 for result in final_result.values() if result == 1)
-    
-    res = c_frames / total_frames
+def calc(total_frames, final_result):
+    count = 0
+    logging.info(f"total_frame: {total_frames}")
+    logging.info(f"{final_result}")
+    for _ in final_result.values():
+        if _ == 1:
+            count += 1
+    logging.info(f"1's Count : {count}")
+    res = count / total_frames
     return res
 
 def send_result(final_result, video_id, ip_address):
@@ -78,12 +80,13 @@ def analyze_frame():
         logging.info(f"\n=========================\nframe: {frame_num} -> {result} \n=========================")
         if result:
             session.final_result[frame_num] = result
-        
+        redis_client.set(session_key, pickle.dumps(session.to_dict()))
+        logging.info(f"\n=========================\n Final_result -> {session.final_result} \n=========================") 
         logging.info(f"{ip_address} {video_id} run succeed")
         return jsonify({"status": "success", "message": "Frame processed"}), 200
     else:
-        final_res = calc(session.final_result)
-        logging.info(f"\n=========================\n{final_res}\n=========================")
+        final_res = calc(frame_num, session.final_result)
+        logging.info(f"\n++++++++++++++++++++++++\n{final_res}\n++++++++++++++++++++++++")
 
         send_result(final_res, video_id, ip_address)
         logging.info(f"\n=========================\nsend emotion data to aggregator\n=========================")

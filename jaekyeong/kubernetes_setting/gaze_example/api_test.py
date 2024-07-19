@@ -13,7 +13,7 @@ service_list = [
         'http://192.168.49.2:30250/blink',
         'http://192.168.49.2:30604/emotion']
 
-for _ in range(26):
+for _ in range(20):
     if _ < 10:
         frame_base64 = encode(f'./face_frames/frame_000{_}.png')
     elif _ >= 10:
@@ -35,7 +35,7 @@ for _ in range(26):
         )
 print("##########################################################################")
 
-for _ in range(26, 27):
+for _ in range(20, 21):
     frame_base64 = encode(f'./face_frames/frame_00{_}.png')
 
     data = {
