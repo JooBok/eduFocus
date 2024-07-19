@@ -25,10 +25,10 @@
   </tr>
   <tr>
     <td align="center">
-      <a href="https://github.com/choijouneun">
-        <img src="https://github.com/choijouneun.png" width="150px;" alt="종은"/>
+      <a href="https://github.com/Pepi10">
+        <img src="https://github.com/Pepi10.png" width="150px;" alt="재경"/>
         <br />
-        <sub><b>최종은</b><br>🙋‍♂️ 교육 컨텐츠 개발 및 인식모델 파인튜닝</sub>
+        <sub><b>김재경</b><br>🙋‍♂️ 모델 구축, 배포</sub>
       </a>
     </td>
   </tr>
