@@ -17,7 +17,7 @@ source nfs.sh
 
 
 ## MongoDB에 데이터 저장
-```
-source mongo.sh
-```
-- 셸파일에서 CONTENTS_NAME 변수값에 collection name 지정
+- mongo.sh 파일에서 CONTENTS_NAME 변수값에 컨텐츠명(컬렉션 이름) 지정 후 하단의 명령어 실행
+    ```
+    source mongo.sh
+    ```
