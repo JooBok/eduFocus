@@ -75,7 +75,7 @@ def analyze_frame():
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
         
         result = ana.detect_face(frame)
-        logging.info(f"\n=========================\n{result}\n=========================")
+        logging.info(f"\n=========================\nframe: {frame_num} -> {result} \n=========================")
         if result:
             session.final_result[frame_num] = result
         
@@ -83,7 +83,12 @@ def analyze_frame():
         return jsonify({"status": "success", "message": "Frame processed"}), 200
     else:
         final_res = calc(session.final_result)
+        logging.info(f"\n=========================\n{final_res}\n=========================")
+
         send_result(final_res, video_id, ip_address)
+        logging.info(f"\n=========================\nsend emotion data to aggregator\n=========================")
+        
+        redis_client.delete(session_key)
         return jsonify({"status": "success", "message": "Video processing completed"}), 200
 
 

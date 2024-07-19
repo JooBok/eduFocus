@@ -282,6 +282,7 @@ def process_frame():
         final_res = calc(session.final_result, saliency_map)
         
         logging.info(f"\n+++++++++++++++++++\n{final_res}\n+++++++++++++++++++")
+        logging.info(f"\n=========================\nsend gaze data to aggregator\n=========================")
 
         send_result(final_res, video_id, ip_address)
         
