@@ -11,39 +11,33 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
+SESSION_SERVICE_URL = "http://session-service"
 #################################### Session ##################################
-sessions = {}
-redis_client = redis.Redis(host='redis-service', port=6379, db=1)
+def get_session(session_id):
+    response = requests.get(f"{SESSION_SERVICE_URL}/get_session/{session_id}")
+    if response.status_code == 200:
+        session_data = response.json()
+        return session_data['components'].get('emotion_analysis', {})
+    else:
+        logger.error(f"Failed to get session: {response.text}")
+        return {}
 
-class Session:
-    def __init__(self):
-        self.final_result = {}
-    def to_dict(self):
-        return{
-            'final_result':self.final_result
-            }
-    @classmethod
-    def from_dict(cls, data):
-        session = cls()
-        session.final_result = data['final_result']
-        return session
+def update_session(session_id, frame_num, result):
+    update_data = {
+        "component": "emotion_analysis",
+        "data": {str(frame_num): result}
+    }
+    response = requests.put(f"{SESSION_SERVICE_URL}/update_session/{session_id}", json=update_data)
+    if response.status_code != 200:
+        logger.error(f"Failed to update session: {response.text}")
 
-def get_session(session_key):
-    session_data = redis_client.get(session_key)
-    if session_data:
-        return Session.from_dict(pickle.loads(session_data))
-    return Session()
 ##############################################################################
-def calc(total_frames, final_result):
-    count = 0
-    logging.info(f"total_frame: {total_frames}")
-    logging.info(f"{final_result}")
-    for _ in final_result.values():
-        if _ == 1:
-            count += 1
-    logging.info(f"1's Count : {count}")
-    res = count / total_frames
-    return res
+def calc(final_result):
+    total_frames = len(final_result)
+    count = sum(1 for result in final_result.values() if result == 1)
+    logging.info(f"total_frames: {total_frames}")
+    logging.info(f"1's Count: {count}")
+    return count / total_frames if total_frames > 0 else 0
 
 def send_result(final_result, video_id, ip_address):
     data = {
@@ -61,14 +55,11 @@ def send_result(final_result, video_id, ip_address):
 def analyze_frame():
     data = request.json
 
+    session_id = data['session_id']
     video_id = data['video_id']
     frame_num = data['frame_number']
     last_frame = data['last_frame']
     ip_address = data['ip_address']
-
-    session_key = f"{ip_address}_{video_id}"
-
-    session = get_session(session_key)
 
     if not last_frame:
         frame_file = data['frame']
@@ -78,21 +69,19 @@ def analyze_frame():
         
         result = ana.detect_face(frame)
         logging.info(f"\n=========================\nframe: {frame_num} -> {result} \n=========================")
-        if result:
-            session.final_result[frame_num] = result
-        redis_client.set(session_key, pickle.dumps(session.to_dict()))
-        logging.info(f"\n=========================\n Final_result -> {session.final_result} \n=========================") 
-        logging.info(f"{ip_address} {video_id} run succeed")
+        if result is not None:
+            update_session(session_id, frame_num, result)
+        logging.info(f"{ip_address} {video_id} frame {frame_num} processed")
         return jsonify({"status": "success", "message": "Frame processed"}), 200
     else:
-        final_res = calc(frame_num, session.final_result)
-        logging.info(f"\n++++++++++++++++++++++++\n{final_res}\n++++++++++++++++++++++++")
+        session_data = get_session(session_id)
+        final_res = calc(session_data)
+        logging.info(f"\n++++++++++++++++++++++++\nFinal Result: {final_res}\n++++++++++++++++++++++++")
 
         send_result(final_res, video_id, ip_address)
         logging.info(f"\n=========================\nsend emotion data to aggregator\n=========================")
         
-        redis_client.delete(session_key)
-        return jsonify({"status": "success", "message": "Video processing completed"}), 200
+        return jsonify({"status": "success", "message": "Video processing completed", "final_result": final_res}), 200
 
 
 if __name__ == '__main__':

@@ -1,20 +1,27 @@
 from flask import Flask, request, jsonify
-import redis, uuid, json
+import redis, json
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
-redis_client = redis.Redis(host = "redis-service", port = 6379, db = 5)
+redis_client = redis.Redis(host = "redis-service", port = 6379)
 
-SESSION_EXPIRY = timedelta(hours = 1)
+### 세션 파기 (대기시간 5분) ###
+SESSION_EXPIRY = timedelta(minutes = 5)
 
 @app.route('/mk-session', methods = ['POST'])
 def mk_session():
+    ### api gw로 부터 받는 data ###
     data = request.json
 
-    ip_addr = data['ip_address']
-    video_id = data['video_id']
+    session_id = data["session_id"]
+    ip_addr = data["ip_address"]
+    video_id = data["video_id"]
 
-    session_id = str(uuid.uuid4())
+    ### session check ###
+    if redis_client.exists(f"session:{session_id}"):
+        return jsonify({"message": "Session Already Exist"}), 200
+
+    ### session make ###
     session_data = {
             "ip_address": ip_addr,
             "video_id": video_id,
@@ -24,10 +31,9 @@ def mk_session():
                 "gaze_tracking": {},
                 "blink_detection": {},
                 "emotion_analysis": {},
-                "result_aggregation": {}
             }
         }
-
+    ### session store ###
     redis_client.setex(
             f"session:{session_id}",
             int(SESSION_EXPIRY.total_seconds()),
@@ -36,6 +42,9 @@ def mk_session():
 
 @app.route('/get_session/<session_id>', methods = ['GET'])
 def get_session(session_id):
+    """
+    session 확인용 함수와 api endpoint
+    """
     session_data = redis_client.get(f"session:{session_id}")
     if session_data:
         return jsonify(json.loads(session_data)), 200
@@ -43,6 +52,9 @@ def get_session(session_id):
 
 @app.route('/update_session/<session_id>', methods = ['PUT'])
 def update_session(session_id):
+    """
+    session에 gaze, blink, emotion의 data 넣는 함수와 api endpoint
+    """
     component = request.json.get('component')
     data = request.json.get('data')
 

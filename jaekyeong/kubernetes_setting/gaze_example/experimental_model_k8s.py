@@ -10,14 +10,13 @@ from threading import Lock
 from flask import Flask, request, jsonify
 from scipy.spatial.transform import Rotation
 from pymongo import MongoClient
-import redis, pickle
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-redis_client = redis.Redis(host='redis-service', port=6379, db=0)
 AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
+SESSION_SERVICE_URL = "http://session-service"
 ################################## Mongo setting ##################################
 # MONGO_URI = 'mongodb://mongodb-service:27017'
 MONGO_URI = 'mongodb://root:root@mongodb:27017/saliency_db?authSource=admin'
@@ -129,41 +128,58 @@ class GazeFixation:
             self.start_time = None
         return False 
 ################################### Session ###################################
-sessions = {}
-
-class Session:
+class SessionData:
     def __init__(self):
         self.gaze_buffer = GazeBuffer()
         self.gaze_fixation = GazeFixation()
         self.gaze_sequence = []
         self.prev_gaze = None
-        self.final_result = {}
+        self.gaze_points = {}
         self.sequence_length = 10
-    def to_dict(self):
-        return {
-            'gaze_buffer': self.gaze_buffer,
-            'gaze_fixation': self.gaze_fixation,
-            'gaze_sequence': self.gaze_sequence,
-            'prev_gaze': self.prev_gaze,
-            'final_result': self.final_result,
-            'sequence_length': self.sequence_length
-        }
+
     @classmethod
     def from_dict(cls, data):
         session = cls()
-        session.gaze_buffer = data['gaze_buffer']
-        session.gaze_fixation = data['gaze_fixation']
-        session.gaze_sequence = data['gaze_sequence']
-        session.prev_gaze = data['prev_gaze']
-        session.final_result = data['final_result']
-        session.sequence_length = data['sequence_length']
+        state = data.get('state', {})
+        session.gaze_buffer = GazeBuffer()
+        session.gaze_buffer.__dict__.update(state.get('gaze_buffer', {}))
+        session.gaze_fixation = GazeFixation()
+        session.gaze_fixation.__dict__.update(state.get('gaze_fixation', {}))
+        session.gaze_sequence = state.get('gaze_sequence', [])
+        session.prev_gaze = state.get('prev_gaze')
+        session.gaze_points = data.get('gaze_points', {})
         return session
 
-def get_session(session_key):
-    session_data = redis_client.get(session_key)
-    if session_data:
-        return Session.from_dict(pickle.loads(session_data))
-    return Session()
+    def to_dict(self):
+        return {
+            'state': {
+                'gaze_buffer': self.gaze_buffer.__dict__,
+                'gaze_fixation': self.gaze_fixation.__dict__,
+                'gaze_sequence': self.gaze_sequence,
+                'prev_gaze': self.prev_gaze
+            },
+            'gaze_points': self.gaze_points
+        }
+
+def get_session(session_id):
+    response = requests.get(f"{SESSION_SERVICE_URL}/get_session/{session_id}")
+    if response.status_code == 200:
+        session_data = response.json()
+        gaze_data = session_data['components'].get('gaze_tracking', {})
+        return SessionData.from_dict(gaze_data)
+    else:
+        logger.error(f"Failed to get session: {response.text}")
+        return SessionData()
+
+def update_session(session_id, session_data):
+    update_data = {
+        "component": "gaze_tracking",
+        "data": session_data.to_dict()
+    }
+    response = requests.put(f"{SESSION_SERVICE_URL}/update_session/{session_id}", json=update_data)
+    if response.status_code != 200:
+        logger.error(f"Failed to update session: {response.text}")
+
 ###############################################################################
 def calculate_distance(iris_landmarks, image_height):
     left_iris, right_iris = iris_landmarks
@@ -220,19 +236,18 @@ def calculate_combined_gaze(left_gaze, right_gaze, head_rotation, distance):
     head_rotation_euler = Rotation.from_matrix(head_rotation).as_euler('xyz')
     return np.concatenate([combined_gaze, head_rotation_euler, [distance]])
 
-def calc(final_result, saliency_map):
+def calc(gaze_points, saliency_map):
     count = 0
-    total_frames = len(final_result)
-    for frame_num, gaze_point in final_result.items():
+    total_frames = len(gaze_points)
+    for frame_num, gaze_point in gaze_points.items():
         x, y = gaze_point
         for saliency_per_frame in saliency_map:
-            if frame_num == saliency_per_frame[0]:
+            if int(frame_num) == saliency_per_frame[0]:
                 if saliency_per_frame[1][y][x] >= 0.7:
                     count += 1
                     break
-    res = count / total_frames
+    res = count / total_frames if total_frames > 0 else 0
     return res
-
 ################################# Send result #################################
 def send_result(final_result, video_id, ip_address):
     data = {
@@ -250,15 +265,13 @@ def send_result(final_result, video_id, ip_address):
 def process_frame():
     data = request.json
 
+    session_id = data['session_id']
     video_id = data['video_id']
     ip_address = data['ip_address']
     frame_num = data['frame_number']
     last_frame = data['last_frame']
 
-
-    session_key = f"{ip_address}_{video_id}"
-
-    session = get_session(session_key)
+    session_data = get_session(session_id)
 
     if not last_frame:
         frame_base64 = data['frame']
@@ -266,30 +279,27 @@ def process_frame():
         nparr = np.frombuffer(frame_data, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        result = process_single_frame(frame, session)
+        result = process_single_frame(frame, session_data)
 
         logging.info(f"\n=========================\n{result}\n=========================")
-        
+
         if result:
-            session.final_result[frame_num] = result['gaze_point']
+            session_data.gaze_points[str(frame_num)] = result['gaze_point']
+            update_session(session_id, session_data)
 
-        redis_client.set(session_key, pickle.dumps(session.to_dict()))        
         return jsonify({"status": "success", "message": "Frame processed"}), 200
-
     else:
-        # saliency_map = extract_saliencyMap(video_id)
         saliency_map = extract_saliencyMap(video_id)
-        final_res = calc(session.final_result, saliency_map)
-        
+        final_res = calc(session_data.gaze_points, saliency_map)
+
         logging.info(f"\n+++++++++++++++++++\n{final_res}\n+++++++++++++++++++")
         logging.info(f"\n=========================\nsend gaze data to aggregator\n=========================")
 
         send_result(final_res, video_id, ip_address)
-        
-        redis_client.delete(session_key)
-        return jsonify({"status": "success", "message": "Video processing completed"}), 200
 
-def process_single_frame(frame, session):
+        return jsonify({"status": "success", "message": "Video processing completed", "final_result": final_res}), 200
+
+def process_single_frame(frame, session_data):
     image = cv2.flip(frame, 1)
     image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     results = face_mesh.process(image_rgb)
@@ -313,29 +323,28 @@ def process_single_frame(frame, session):
             left_gaze_corrected = correct_gaze_vector(left_gaze, head_rotation)
             right_gaze_corrected = correct_gaze_vector(right_gaze, head_rotation)
 
-            ### 7차원 데이터로 변경 ###
             combined_gaze = calculate_combined_gaze(left_gaze_corrected, right_gaze_corrected, head_rotation, estimated_distance)
 
-            session.gaze_sequence.append(combined_gaze)
+            session_data.gaze_sequence.append(combined_gaze)
 
-            if len(session.gaze_sequence) > session.sequence_length:
-                session.gaze_sequence.pop(0)
+            if len(session_data.gaze_sequence) > session_data.sequence_length:
+                session_data.gaze_sequence.pop(0)
 
-            if len(session.gaze_sequence) == session.sequence_length:
-                gaze_input = np.array(session.gaze_sequence).flatten().reshape(1, -1)
+            if len(session_data.gaze_sequence) == session_data.sequence_length:
+                gaze_input = np.array(session_data.gaze_sequence).flatten().reshape(1, -1)
                 with model_lock:
                     predicted_x = model_x.predict(gaze_input)[0]
                     predicted_y = model_y.predict(gaze_input)[0]
                 predicted_gaze = np.array([predicted_x, predicted_y])
                 logger.info(f"\n===================\n{predicted_gaze}\n===================")
 
-                session.gaze_buffer.add(predicted_gaze)
-                smoothed_gaze = session.gaze_buffer.get_average()
+                session_data.gaze_buffer.add(predicted_gaze)
+                smoothed_gaze = session_data.gaze_buffer.get_average()
 
-                filtered_gaze = filter_sudden_changes(smoothed_gaze, session.prev_gaze)
+                filtered_gaze = filter_sudden_changes(smoothed_gaze, session_data.prev_gaze)
 
                 predicted_x, predicted_y = filtered_gaze
-                session.prev_gaze = filtered_gaze
+                session_data.prev_gaze = filtered_gaze
 
                 screen_x = int((predicted_x + 1) * w / 2)
                 screen_y = int((1 - predicted_y) * h / 2)
