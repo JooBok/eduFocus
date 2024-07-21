@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: emotion-analysis
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: emotion-analysis
+  template:
+    metadata:
+      labels:
+        app: emotion-analysis
+    spec:
+      containers:
+      - name: emotion-analysis
+        image: pepi10/emotion-analysis-v2:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: SESSION_SERVICE_URL
+          value: "http://session-service"
+        - name: AGGREGATOR_URL
+          value: "http://result-aggregator-service/aggregate"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: emotion-analysis-service
+spec:
+  selector:
+    app: emotion-analysis
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+      nodePort: 30604
+  type: LoadBalancer

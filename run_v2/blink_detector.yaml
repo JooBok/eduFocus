@@ -1,0 +1,38 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: blink-detection
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: blink-detection
+  template:
+    metadata:
+      labels:
+        app: blink-detection
+    spec:
+      containers:
+      - name: blink-detection
+        image: pepi10/blink-detection-v2:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: SESSION_SERVICE_URL
+          value: "http://session-service"
+        - name: AGGREGATOR_URL
+          value: "http://result-aggregator-service/aggregate"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: blink-detection-service
+spec:
+  selector:
+    app: blink-detection
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+      nodePort: 30250
+  type: LoadBalancer
