@@ -3,3 +3,4 @@ venv
 *contents
 .env
 __pycache__
+face_frames/
