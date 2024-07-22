@@ -1,8 +1,7 @@
-import time, json, logging
+import logging
 import requests, base64, cv2
 import mediapipe as mp
 import numpy as np
-from threading import Lock
 from flask import Flask, request, jsonify
 
 app = Flask(__name__)
@@ -271,24 +270,29 @@ def get_session(session_id):
         if response.status_code == 200:
             session_data = response.json()
             blink_data = session_data['components'].get('blink_detection', {})
-            return Session.from_dict(blink_data)
+            return blink_data
         elif response.status_code == 404:
             logger.warning(f"Session not found. Creating new session for {session_id}")
-            new_session = Session()
-            create_session(session_id, new_session)
+            new_session = {}
+            create_session(session_id)
             return new_session
         else:
             logger.error(f"Failed to get session. Status code: {response.status_code}, Response: {response.text}")
-            return Session()
+            return {}
     except requests.RequestException as e:
         logger.error(f"Request failed when getting session: {e}")
-        return Session()
-
-def update_session(session_id, session):
+        return {}
+def update_session(session_id, frame_number, blink_data):
     try:
         update_data = {
             "component": "blink_detection",
-            "data": session.to_dict()
+            "data": {
+                "components": {
+                    "blink_detection": {
+                        str(frame_number): blink_data
+                    }
+                }
+            }
         }
         response = requests.put(f"{SESSION_SERVICE_URL}/update_session/{session_id}", json=update_data)
         logger.debug(f"Update session response: {response.status_code}, {response.text}")
@@ -296,21 +300,21 @@ def update_session(session_id, session):
             logger.info(f"Successfully updated session for {session_id}")
         elif response.status_code == 404:
             logger.warning(f"Session not found when updating. Creating new session for {session_id}")
-            create_session(session_id, session)
+            create_session(session_id)
+            update_session(session_id, frame_number, blink_data)
         else:
             logger.error(f"Failed to update session. Status code: {response.status_code}, Response: {response.text}")
     except requests.RequestException as e:
         logger.error(f"Request failed when updating session: {e}")
-
-def create_session(session_id, session):
+def create_session(session_id):
     try:
         create_data = {
             "session_id": session_id,
             "components": {
-                "blink_detection": session.to_dict()
+                "blink_detection": {}
             }
         }
-        response = requests.post(f"{SESSION_SERVICE_URL}/blink_session", json=create_data)
+        response = requests.post(f"{SESSION_SERVICE_URL}/mk-session", json=create_data)
         logger.debug(f"Create session response: {response.status_code}, {response.text}")
         if response.status_code == 201:
             logger.info(f"Successfully created new session for {session_id}")
@@ -331,49 +335,48 @@ def blink():
     if not video_id or frame_number is None:
         return jsonify({"status": "error", "message": "Missing data"}), 400
 
-    frame_base64 = data['frame']
-    frame_data = base64.b64decode(frame_base64)
-    nparr = np.frombuffer(frame_data, np.uint8)
-    frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-
     session_id = f"{ip_address}_{video_id}"
-    session = get_session(session_id)
+    blink_detector = BlinkDetector()
+    blink_detector.initialize_mp_face_mesh()
 
     if not is_last_frame:
+        frame_base64 = data['frame']
+        frame_data = base64.b64decode(frame_base64)
+        nparr = np.frombuffer(frame_data, np.uint8)
+        frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+
         logger.info("Processing frame...")
 
-        left_ear, right_ear, blink_count, concentration, face_landmarks = session.blink_detector.detect_blink(frame)
+        left_ear, right_ear, blink_count, concentration, face_landmarks = blink_detector.detect_blink(frame)
         
         logger.info(f"left_ear: {left_ear}, right_ear: {right_ear}, blink_count: {blink_count}, concentration: {concentration}, face_landmarks: {face_landmarks}")
         logger.info(f"====================\nConcentration: {concentration}\n====================")
         
         if face_landmarks is not None:
-            avg_ear = (left_ear + right_ear) / 2.0
-            session.total_concentration += concentration
-            session.frame_count += 1
-            session.total_concentration_scores.append(concentration)
-
-        update_session(session_id, session)
+            blink_data = {
+                "left_ear": left_ear,
+                "right_ear": right_ear,
+                "blink_count": blink_count,
+                "concentration": concentration
+            }
+            update_session(session_id, frame_number, blink_data)
         
-        logger.info(f"{ip_address} {video_id} {concentration} run succeed")
+        logger.info(f"{ip_address} {video_id} frame {frame_number} processed")
 
         return jsonify({"status": "success", "message": "Frame processed"}), 200
 
     else:
         logger.info("Processing last frame...")
-        session.end_frame = frame_number
-        if session.frame_count > 0:
-            average_concentration = session.total_concentration / session.frame_count
-            concentration_percentage = average_concentration * 100
+        session_data = get_session(session_id)
+        blink_data = session_data.get('components', {}).get('blink_detection', {})
+        
+        if blink_data:
+            total_concentration = sum(frame['concentration'] for frame in blink_data.values())
+            frame_count = len(blink_data)
+            average_concentration = total_concentration / frame_count if frame_count > 0 else 0
+            final_concentration_score = average_concentration * 100
         else:
-            concentration_percentage = 0
-
-        normalized_concentration = concentration_percentage
-
-        total_minutes = session.frame_count / (20 * 60)
-        weightings = np.linspace(1, 0.5, max(1, int(total_minutes)))
-        concentration_scores = [normalized_concentration * w for w in weightings]
-        final_concentration_score = np.mean(concentration_scores)
+            final_concentration_score = 0
 
         send_result(final_concentration_score, video_id, ip_address)
         

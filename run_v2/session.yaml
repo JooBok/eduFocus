@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: session
-        image: pepi10/centralized-session:latest
+        image: pepi10/centralized-session-v2-test:latest
         ports:
         - containerPort: 5000
         env:

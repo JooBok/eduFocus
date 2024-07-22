@@ -72,6 +72,32 @@ def update_session(session_id):
         return jsonify({'message': 'Session Updated Successfully'}), 200
     return jsonify({'error': 'Session Not Found'}), 404
 
+@app.route('/update_session/<session_id>', methods=['PUT'])
+def update_session(session_id):
+    """
+    session에 gaze, blink, emotion의 data 넣는 함수와 api endpoint
+    """
+    component = request.json.get('component')
+    data = request.json.get('data', {})
+
+    session_data = redis_client.get(f"session:{session_id}")
+    if session_data:
+        session = json.loads(session_data)
+
+        if 'components' in data and component in data['components']:
+            session['components'][component].update(data['components'][component])
+        else:
+            session['components'][component].update(data)
+
+        session['last_accessed'] = datetime.now().isoformat()
+
+        redis_client.setex(
+            f"session:{session_id}",
+            int(SESSION_EXPIRY.total_seconds()),
+            json.dumps(session))
+
+        return jsonify({'message': 'Session Updated Successfully'}), 200
+    return jsonify({'error': 'Session Not Found'}), 404
 
 if __name__ == '__main__':
     app.run(host = '0.0.0.0', port = 5000)

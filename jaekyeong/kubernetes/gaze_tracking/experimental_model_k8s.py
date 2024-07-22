@@ -109,32 +109,40 @@ def get_session(session_id):
         logger.error(f"Failed to get session. Status code: {response.status_code}, Response: {response.text}")
         return GazeSession()
 
-def update_session(session_id, gaze_session):
+def update_session(session_id: str, frame_number: int, gaze_data: Tuple[int, int]) -> None:
     update_data = {
         "component": "gaze_tracking",
-        "data": gaze_session.to_dict()
+        "data": {
+            "components": {
+                "gaze_tracking": {
+                    str(frame_number): gaze_data
+                }
+            }
+        }
     }
     response = requests.put(f"{SESSION_SERVICE_URL}/update_session/{session_id}", json=update_data)
     if response.status_code == 200:
-        logger.info(f"Successfully updated session for {session_id}")
+        logger.info(f"Successfully updated session for {session_id}, frame {frame_number}")
     elif response.status_code == 404:
-        logger.warning(f"Session not found when updating. Creating new session for {session_id}")
-        create_session(session_id, gaze_session)
+        logger.warning(f"Session not found for {session_id}. Attempting to create a new session.")
+        create_session(session_id)
     else:
         logger.error(f"Failed to update session. Status code: {response.status_code}, Response: {response.text}")
-
-def create_session(session_id, gaze_session):
+        raise Exception("Failed to update session")
+    
+def create_session(session_id: str) -> None:
     create_data = {
         "session_id": session_id,
         "components": {
-            "gaze_tracking": gaze_session.to_dict()
+            "gaze_tracking": {}
         }
     }
-    response = requests.post(f"{SESSION_SERVICE_URL}/create_session", json=create_data)
+    response = requests.post(f"{SESSION_SERVICE_URL}/mk-session", json=create_data)
     if response.status_code == 201:
         logger.info(f"Successfully created new session for {session_id}")
     else:
-        logger.error(f"Failed to create session. Status code: {response.status_code}, Response: {response.text}")
+        logger.error(f"Failed to create session. Status code: {response.status_code}")
+        raise Exception("Failed to create session")
 
 ################################# GBR 모델 인풋 만드는 class, 함수 #################################
 class GazeBuffer:
@@ -282,7 +290,7 @@ def calculate_combined_gaze(left_gaze, right_gaze, head_rotation, distance):
 def calc(gaze_points, saliency_map):
     count = 0
     total_frames = len(gaze_points)
-    logger.info(f"cal -> gaze_points {gaze_points}")
+    logger.info(f"calc -> gaze_points {gaze_points}")
     for frame_num, gaze_point in gaze_points.items():
         x, y = gaze_point
         for saliency_per_frame in saliency_map:
@@ -310,7 +318,6 @@ def send_result(final_result, video_id, ip_address):
 @app.route('/gaze', methods=['POST'])
 def process_frame():
     data = request.json
-
     session_id = data['session_id']
     video_id = data['video_id']
     frame_num = data['frame_number']
@@ -330,9 +337,8 @@ def process_frame():
         logger.info(f"Frame {frame_num} processed. Result: {result}")
         
         if result:
-            gaze_session.final_result[frame_num] = result
+            update_session(session_id, frame_num, result)
 
-        update_session(session_id, gaze_session)
         return jsonify({"status": "success", "message": "Frame processed"}), 200
 
     else:
@@ -342,8 +348,8 @@ def process_frame():
         try:
             while time.time() - start_time <= timeout:
                 final_session = get_session(session_id)
-                if len(final_session.final_result) == frame_num:
-                    final_res = calc(final_session.final_result, saliency_map)
+                if len(final_session.components['gaze_tracking']) == frame_num:
+                    final_res = calc(final_session.components['gaze_tracking'], saliency_map)
                     break
                 time.sleep(0.1)
             else:
@@ -352,7 +358,7 @@ def process_frame():
         except TimeoutError as e:
             logger.warning(f"Timeout occurred: {e}. Proceeding with available data.")
             final_session = get_session(session_id)
-            final_res = calc(final_session.final_result, saliency_map)
+            final_res = calc(final_session.components['gaze_tracking'], saliency_map)
 
         logger.info(f"Final result: {final_res}")
         logger.info("Sending gaze data to aggregator")
