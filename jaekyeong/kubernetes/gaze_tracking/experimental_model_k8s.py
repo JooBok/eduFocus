@@ -1,4 +1,4 @@
-import time, json, bson, joblib
+import time, joblib
 import requests, base64, cv2, logging
 import warnings
 warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf.symbol_database")
@@ -7,6 +7,9 @@ import mediapipe as mp
 import numpy as np
 from threading import Lock
 
+from requests.adapters import HTTPAdapter
+from requests.packages.urllib3.util.retry import Retry
+
 from flask import Flask, request, jsonify
 from scipy.spatial.transform import Rotation
 from pymongo import MongoClient
@@ -14,6 +17,18 @@ from pymongo import MongoClient
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+### api 통신 재시도 ###
+retry_strategy = Retry(
+    total=3,
+    status_forcelist=[429, 500, 502, 503, 504],
+    allowed_methods=["HEAD", "GET", "OPTIONS", "POST", "PUT"],
+    backoff_factor=1
+)
+adapter = HTTPAdapter(max_retries=retry_strategy)
+http = requests.Session()
+http.mount("https://", adapter)
+http.mount("http://", adapter)
 
 AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 SESSION_SERVICE_URL = "http://session-service"
@@ -62,7 +77,7 @@ def extract_saliencyMap(video_id):
         if frame_num is not None and saliency_map is not None:
             extracted_data.append([frame_num, saliency_map])
         else:
-            print("Error: 'frame_num' or 'saliency_map' not found in the document")
+            logger.error("Error: 'frame_num' or 'saliency_map' not found in the document")
 
     return extracted_data
 ################################### Session ###################################
@@ -97,16 +112,14 @@ class GazeSession:
         return session
 
 def get_session(session_id):
-    response = requests.get(f"{SESSION_SERVICE_URL}/get_session/{session_id}")
-    if response.status_code == 200:
+    try:
+        response = http.get(f"{SESSION_SERVICE_URL}/get_session/{session_id}", timeout=5)
+        response.raise_for_status()
         session_data = response.json()
         gaze_data = session_data['components'].get('gaze_tracking', {})
         return GazeSession.from_dict(gaze_data)
-    elif response.status_code == 404:
-        logger.warning(f"Session not found. Creating new session for {session_id}")
-        return GazeSession()
-    else:
-        logger.error(f"Failed to get session. Status code: {response.status_code}, Response: {response.text}")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to get session: {e}")
         return GazeSession()
 
 def update_session(session_id, gaze_session):
@@ -114,14 +127,12 @@ def update_session(session_id, gaze_session):
         "component": "gaze_tracking",
         "data": gaze_session.to_dict()
     }
-    response = requests.put(f"{SESSION_SERVICE_URL}/update_session/{session_id}", json=update_data)
-    if response.status_code == 200:
+    try:
+        response = http.put(f"{SESSION_SERVICE_URL}/update_session/{session_id}", json=update_data, timeout=5)
+        response.raise_for_status()
         logger.info(f"Successfully updated session for {session_id}")
-    elif response.status_code == 404:
-        logger.warning(f"Session not found when updating. Creating new session for {session_id}")
-        create_session(session_id, gaze_session)
-    else:
-        logger.error(f"Failed to update session. Status code: {response.status_code}, Response: {response.text}")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to update session: {e}")
 
 def create_session(session_id, gaze_session):
     create_data = {
@@ -130,13 +141,13 @@ def create_session(session_id, gaze_session):
             "gaze_tracking": gaze_session.to_dict()
         }
     }
-    response = requests.post(f"{SESSION_SERVICE_URL}/create_session", json=create_data)
-    if response.status_code == 201:
+    try:
+        response = http.post(f"{SESSION_SERVICE_URL}/create_session", json=create_data, timeout=5)
+        response.raise_for_status()
         logger.info(f"Successfully created new session for {session_id}")
-    else:
-        logger.error(f"Failed to create session. Status code: {response.status_code}, Response: {response.text}")
-
-################################# GBR 인풋 만드는 class, 함수 #################################
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to create session: {e}")
+################################# GBR 모델 인풋 만드는 class, 함수 #################################
 class GazeBuffer:
     def __init__(self, buffer_size=3, smoothing_factor=0.3):
         self.buffer = []
@@ -302,10 +313,12 @@ def send_result(final_result, video_id, ip_address):
         "ip_address": ip_address,
         "model_type": "gaze"
     }
-    response = requests.post(AGGREGATOR_URL, json=data)
-
-    if response.status_code != 200:
-        print(f"Failed to send result: {response.text}")
+    try:
+        response = http.post(AGGREGATOR_URL, json=data, timeout=5)
+        response.raise_for_status()
+        logger.info("Successfully sent result to aggregator")
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Failed to send result: {e}")
 ################################## main code ##################################
 @app.route('/gaze', methods=['POST'])
 def process_frame():
@@ -319,7 +332,7 @@ def process_frame():
 
     gaze_session = get_session(session_id)
 
-    if not last_frame:
+    if not last_frame: 
         frame_base64 = data['frame']
         frame_data = base64.b64decode(frame_base64)
         nparr = np.frombuffer(frame_data, np.uint8)
@@ -333,12 +346,26 @@ def process_frame():
             gaze_session.final_result[frame_num] = result
 
         update_session(session_id, gaze_session)
-        return jsonify({"status": "success", "message": "Frame processed"}), 200
 
     else:
         saliency_map = extract_saliencyMap(video_id)
-        final_res = calc(gaze_session.final_result, saliency_map)
-        
+        start_time = time.time()
+        timeout = 5        
+        try:
+            while time.time() - start_time <= timeout:
+                final_session = get_session(session_id)
+                if len(final_session.final_result) == frame_num:
+                    final_res = calc(final_session.final_result, saliency_map)
+                    break
+                time.sleep(0.1)
+            else:
+                raise TimeoutError("Not all frames processed")
+
+        except TimeoutError as e:
+            logger.warning(f"Timeout occurred: {e}. Proceeding with available data.")
+            final_session = get_session(session_id)
+            final_res = calc(final_session.final_result, saliency_map)
+
         logger.info(f"Final result: {final_res}")
         logger.info("Sending gaze data to aggregator")
 

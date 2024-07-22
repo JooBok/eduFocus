@@ -5,14 +5,12 @@ import numpy as np
 from threading import Lock
 from flask import Flask, request, jsonify
 
-import redis, pickle
-
 app = Flask(__name__)
-redis_client = redis.Redis(host='redis-service', port=6379, db=2)
-
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
+AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
+SESSION_SERVICE_URL = "http://session-service"
 #####################################################################################################################################
 class BlinkDetector:
     def __init__(self, ear_threshold=0.25, consecutive_frames=3,
@@ -216,27 +214,22 @@ class BlinkDetector:
         weight = max(0.01, min(1, (m - index) / m * (self.sequence_length - max_frames) / self.sequence_length))
         
         return weight
-    
-
 ######################################## 결과 전송 ############################################################
-AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
-
 def send_result(final_concentration_score, video_id, ip_address):
-    data = {
-        "video_id": video_id,
-        "final_concentration_score": final_concentration_score,
-        "ip_address": ip_address,
-        "model_type": "blink_detection"
-    }
-    response = requests.post(AGGREGATOR_URL, json=data)
-
-    if response.status_code != 200:
-        print(f"Failed to send result: {response.text}")
-
-
+    try:
+        data = {
+            "video_id": video_id,
+            "final_score": final_concentration_score,
+            "ip_address": ip_address,
+            "model_type": "blink_detection"
+        }
+        response = requests.post(AGGREGATOR_URL, json=data)
+        logger.debug(f"Send result response: {response.status_code}, {response.text}")
+        if response.status_code != 200:
+            logger.error(f"Failed to send result: {response.text}")
+    except requests.RequestException as e:
+        logger.error(f"Request failed when sending result: {e}")
 ######################################### 세션 관리 #############################################################
-sessions = {}
-
 class Session:
     def __init__(self):
         self.blink_detector = BlinkDetector()
@@ -260,7 +253,10 @@ class Session:
     @staticmethod
     def from_dict(data):
         session = Session()
-        session.blink_detector = BlinkDetector.from_dict(data["blink_detector"])
+        if "blink_detector" in data:
+            session.blink_detector = BlinkDetector.from_dict(data["blink_detector"])
+        else:
+            logger.warning("'blink_detector' not found in session data. Initializing new BlinkDetector.")
         session.total_concentration = data["total_concentration"]
         session.frame_count = data["frame_count"]
         session.start_frame = data["start_frame"]
@@ -268,19 +264,63 @@ class Session:
         session.total_concentration_scores = data["total_concentration_scores"]
         return session
 
-def get_session(session_key):
-    session_data = redis_client.get(session_key)
-    if session_data:
-        return Session.from_dict(pickle.loads(session_data))
-    return Session()
+def get_session(session_id):
+    try:
+        response = requests.get(f"{SESSION_SERVICE_URL}/get_session/{session_id}")
+        logger.debug(f"Get session response: {response.status_code}, {response.text}")
+        if response.status_code == 200:
+            session_data = response.json()
+            blink_data = session_data['components'].get('blink_detection', {})
+            return Session.from_dict(blink_data)
+        elif response.status_code == 404:
+            logger.warning(f"Session not found. Creating new session for {session_id}")
+            new_session = Session()
+            create_session(session_id, new_session)
+            return new_session
+        else:
+            logger.error(f"Failed to get session. Status code: {response.status_code}, Response: {response.text}")
+            return Session()
+    except requests.RequestException as e:
+        logger.error(f"Request failed when getting session: {e}")
+        return Session()
 
-def save_session(session_key, session):
-    redis_client.set(session_key, pickle.dumps(session.to_dict()))
-    
+def update_session(session_id, session):
+    try:
+        update_data = {
+            "component": "blink_detection",
+            "data": session.to_dict()
+        }
+        response = requests.put(f"{SESSION_SERVICE_URL}/update_session/{session_id}", json=update_data)
+        logger.debug(f"Update session response: {response.status_code}, {response.text}")
+        if response.status_code == 200:
+            logger.info(f"Successfully updated session for {session_id}")
+        elif response.status_code == 404:
+            logger.warning(f"Session not found when updating. Creating new session for {session_id}")
+            create_session(session_id, session)
+        else:
+            logger.error(f"Failed to update session. Status code: {response.status_code}, Response: {response.text}")
+    except requests.RequestException as e:
+        logger.error(f"Request failed when updating session: {e}")
+
+def create_session(session_id, session):
+    try:
+        create_data = {
+            "session_id": session_id,
+            "components": {
+                "blink_detection": session.to_dict()
+            }
+        }
+        response = requests.post(f"{SESSION_SERVICE_URL}/create_session", json=create_data)
+        logger.debug(f"Create session response: {response.status_code}, {response.text}")
+        if response.status_code == 201:
+            logger.info(f"Successfully created new session for {session_id}")
+        else:
+            logger.error(f"Failed to create session. Status code: {response.status_code}, Response: {response.text}")
+    except requests.RequestException as e:
+        logger.error(f"Request failed when creating session: {e}")
 ######################################### api 엔드포인트 정의 #########################################################
 @app.route('/blink', methods=['POST'])
 def blink():
-    # 폼 데이터에서 필요한 필드 가져오기
     data = request.json
 
     video_id = data['video_id']
@@ -288,49 +328,39 @@ def blink():
     frame_number = data['frame_number']
     is_last_frame = data['last_frame']
 
-    # 필수 데이터가 없는 경우 에러 반환
     if not video_id or frame_number is None:
         return jsonify({"status": "error", "message": "Missing data"}), 400
 
-    # 파일 데이터에서 프레임 가져오기
     frame_base64 = data['frame']
     frame_data = base64.b64decode(frame_base64)
     nparr = np.frombuffer(frame_data, np.uint8)
     frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-    # 세션 키 생성
-    session_key = f"{ip_address}_{video_id}"
-    session = get_session(session_key)
+    session_id = f"{ip_address}_{video_id}"
+    session = get_session(session_id)
 
     if not is_last_frame:
-        print("Processing frame...")
+        logger.info("Processing frame...")
 
-        # 깜빡임 감지
         left_ear, right_ear, blink_count, concentration, face_landmarks = session.blink_detector.detect_blink(frame)
         
-        # 각 변수의 값을 로그로 기록
-        logging.info(f"left_ear: {left_ear}, right_ear: {right_ear}, blink_count: {blink_count}, concentration: {concentration}, face_landmarks: {face_landmarks}")
-
-        # concentration 값을 로그에 기록
-        logging.info(f"====================\nConcentration: {concentration}\n====================")
+        logger.info(f"left_ear: {left_ear}, right_ear: {right_ear}, blink_count: {blink_count}, concentration: {concentration}, face_landmarks: {face_landmarks}")
+        logger.info(f"====================\nConcentration: {concentration}\n====================")
         
-        # 집중도 데이터 업데이트
         if face_landmarks is not None:
             avg_ear = (left_ear + right_ear) / 2.0
             session.total_concentration += concentration
             session.frame_count += 1
             session.total_concentration_scores.append(concentration)
 
-        # 세션 저장
-        save_session(session_key, session)
+        update_session(session_id, session)
         
-        logging.info(f"{ip_address} {video_id} {concentration} run succeed")
+        logger.info(f"{ip_address} {video_id} {concentration} run succeed")
 
         return jsonify({"status": "success", "message": "Frame processed"}), 200
 
     else:
-        print("Processing last frame...")
-        # 최종 집중도 계산 및 출력
+        logger.info("Processing last frame...")
         session.end_frame = frame_number
         if session.frame_count > 0:
             average_concentration = session.total_concentration / session.frame_count
@@ -338,23 +368,16 @@ def blink():
         else:
             concentration_percentage = 0
 
-        # normalized_concentration 변수 정의
         normalized_concentration = concentration_percentage
 
-        # 시간 가중치 적용 및 최종 집중 점수 계산
         total_minutes = session.frame_count / (20 * 60)
         weightings = np.linspace(1, 0.5, max(1, int(total_minutes)))
         concentration_scores = [normalized_concentration * w for w in weightings]
         final_concentration_score = np.mean(concentration_scores)
 
-        # 최종 결과 전송
         send_result(final_concentration_score, video_id, ip_address)
-        redis_client.delete(session_key)
+        
         return jsonify({"status": "success", "message": "Video processing completed", "final_concentration_score": final_concentration_score}), 200
-    
-    return jsonify({"status": "success", "message": "Frame processed"}), 200
-
-
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000)
