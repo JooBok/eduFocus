@@ -1,8 +1,7 @@
 from flask import Flask, request, jsonify
 from analysis_server import analysis
-import cv2, requests, base64, logging
+import cv2, requests, base64, logging, time
 import numpy as np
-import redis, pickle
 
 app = Flask(__name__)
 ana = analysis()
@@ -76,13 +75,25 @@ def analyze_frame():
         logging.info(f"{ip_address} {video_id} frame {frame_num} processed")
         return jsonify({"status": "success", "message": "Frame processed"}), 200
     else:
-        session_data = get_session(session_id)
-        final_res = calc(session_data)
-        logging.info(f"\n++++++++++++++++++++++++\nFinal Result: {final_res}\n++++++++++++++++++++++++")
+        start_time = time.time()
+        timeout = 5
+        try:
+            while time.time() - start_time <= timeout:
+                session_data = get_session(session_id)
+                if len(session_data) == frame_num - 1:
+                    final_res = calc(session_data)
+                    break
+            else:
+                raise TimeoutError("Not all frames processed within 5 seconds")
+        except TimeoutError as e:
+            logger.warning(f"Timeout occurred: {e}. Proceeding with available data.")
+            session_data = get_session(session_id)
+            final_res = calc(session_data)
 
+        logger.info(f"Final result: {final_res}")
+        logger.info("Sending gaze data to aggregator")
         send_result(final_res, video_id, ip_address)
-        logging.info(f"\n=========================\nsend emotion data to aggregator\n=========================")
-        
+
         return jsonify({"status": "success", "message": "Video processing completed", "final_result": final_res}), 200
 
 
