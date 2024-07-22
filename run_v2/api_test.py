@@ -8,7 +8,7 @@ def encode(path):
     frame_base64 = base64.b64encode(buffer).decode('utf-8')
     return frame_base64
 
-gw_uri = 'http://api-gateway-service/process'
+gw_uri = 'http://192.168.49.2:32678/process'
 
 for _ in range(20):
     if _ < 10:
@@ -25,7 +25,7 @@ for _ in range(20):
     }
 
     response = requests.post(
-        gw_url,
+        gw_uri,
         headers={'Content-Type': 'application/json'},
         data=json.dumps(data)
     )
@@ -43,7 +43,7 @@ for _ in range(20, 21):
     }
 
     response = requests.post(
-        gw_url,
+        gw_uri,
         headers={'Content-Type': 'application/json'},
         data=json.dumps(data)
     )

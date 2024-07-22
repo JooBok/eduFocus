@@ -37,7 +37,9 @@ def calc(final_result):
     count = sum(1 for result in final_result.values() if result == 1)
     logging.info(f"total_frames: {total_frames}")
     logging.info(f"1's Count: {count}")
-    return count / total_frames if total_frames > 0 else 0
+    res = count / total_frames if total_frames > 0 else 0
+    res = round(res, 4) * 100
+    return res
 
 def send_result(final_result, video_id, ip_address):
     data = {
