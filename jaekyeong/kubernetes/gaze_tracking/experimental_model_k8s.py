@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 SESSION_SERVICE_URL = "http://session-service"
+gaze_sessions = {}
 ################################## Mongo setting ##################################
 # MONGO_URI = 'mongodb://mongodb-service:27017'
 MONGO_URI = 'mongodb://root:root@mongodb:27017/saliency_db?authSource=admin'
@@ -67,47 +68,59 @@ def extract_saliencyMap(video_id):
     return extracted_data
 ################################### Session ###################################
 class GazeSession:
-    def __init__(self):
+    def __init__(self, session_id):
+        self.session_id = session_id
         self.gaze_buffer = GazeBuffer()
         self.gaze_fixation = GazeFixation()
         self.gaze_sequence = []
         self.prev_gaze = None
-        self.final_result = {}
         self.sequence_length = 10
+
+    def add_frame_data(self, frame_number, gaze_data):
+        # 로컬 데이터 처리
+        self.gaze_buffer.add(gaze_data)
+        self.gaze_fixation.update(gaze_data)
+        self.gaze_sequence.append(gaze_data)
+        if len(self.gaze_sequence) > self.sequence_length:
+            self.gaze_sequence.pop(0)
+        self.prev_gaze = gaze_data
 
     def to_dict(self):
         return {
+            'session_id': self.session_id,
             'gaze_buffer': self.gaze_buffer.to_dict(),
             'gaze_fixation': self.gaze_fixation.to_dict(),
             'gaze_sequence': [gaze.tolist() for gaze in self.gaze_sequence],
             'prev_gaze': self.prev_gaze.tolist() if self.prev_gaze is not None else None,
-            'final_result': {str(k): v for k, v in self.final_result.items()},
             'sequence_length': self.sequence_length
         }
 
     @classmethod
     def from_dict(cls, data):
-        session = cls()
+        session = cls(data['session_id'])
         session.gaze_buffer = GazeBuffer.from_dict(data.get('gaze_buffer', {}))
         session.gaze_fixation = GazeFixation.from_dict(data.get('gaze_fixation', {}))
         session.gaze_sequence = [np.array(gaze) for gaze in data.get('gaze_sequence', [])]
         session.prev_gaze = np.array(data['prev_gaze']) if data.get('prev_gaze') is not None else None
-        session.final_result = {int(k): v for k, v in data.get('final_result', {}).items()}
         session.sequence_length = data.get('sequence_length', 10)
         return session
+def get_or_create_gaze_session(session_id):
+    if session_id not in gaze_sessions:
+        gaze_sessions[session_id] = GazeSession(session_id)
+    return gaze_sessions[session_id]
 
 def get_session(session_id):
     response = requests.get(f"{SESSION_SERVICE_URL}/get_session/{session_id}")
     if response.status_code == 200:
         session_data = response.json()
         gaze_data = session_data['components'].get('gaze_tracking', {})
-        return GazeSession.from_dict(gaze_data)
+        return gaze_data
     elif response.status_code == 404:
         logger.warning(f"Session not found. Creating new session for {session_id}")
-        return GazeSession()
+        return {}
     else:
         logger.error(f"Failed to get session. Status code: {response.status_code}, Response: {response.text}")
-        return GazeSession()
+        return {}
 
 def update_session(session_id: str, frame_number: int, gaze_data: Tuple[int, int]) -> None:
     update_data = {
@@ -126,10 +139,12 @@ def update_session(session_id: str, frame_number: int, gaze_data: Tuple[int, int
     elif response.status_code == 404:
         logger.warning(f"Session not found for {session_id}. Attempting to create a new session.")
         create_session(session_id)
+        # 세션 생성 후 다시 업데이트 시도
+        update_session(session_id, frame_number, gaze_data)
     else:
         logger.error(f"Failed to update session. Status code: {response.status_code}, Response: {response.text}")
         raise Exception("Failed to update session")
-    
+
 def create_session(session_id: str) -> None:
     create_data = {
         "session_id": session_id,
@@ -324,7 +339,7 @@ def process_frame():
     last_frame = data['last_frame']
     ip_address = data['ip_address']
 
-    gaze_session = get_session(session_id)
+    gaze_session = get_or_create_gaze_session(session_id)
 
     if not last_frame: 
         frame_base64 = data['frame']
@@ -337,6 +352,7 @@ def process_frame():
         logger.info(f"Frame {frame_num} processed. Result: {result}")
         
         if result:
+            gaze_session.add_frame_data(frame_num, result)
             update_session(session_id, frame_num, result)
 
         return jsonify({"status": "success", "message": "Frame processed"}), 200
@@ -347,9 +363,9 @@ def process_frame():
         timeout = 5 
         try:
             while time.time() - start_time <= timeout:
-                final_session = get_session(session_id)
-                if len(final_session.components['gaze_tracking']) == frame_num:
-                    final_res = calc(final_session.components['gaze_tracking'], saliency_map)
+                central_session_data = get_session(session_id)
+                if len(central_session_data.get('components', {}).get('gaze_tracking', {})) == frame_num:
+                    final_res = calc(central_session_data['components']['gaze_tracking'], saliency_map)
                     break
                 time.sleep(0.1)
             else:
@@ -357,8 +373,8 @@ def process_frame():
         
         except TimeoutError as e:
             logger.warning(f"Timeout occurred: {e}. Proceeding with available data.")
-            final_session = get_session(session_id)
-            final_res = calc(final_session.components['gaze_tracking'], saliency_map)
+            central_session_data = get_session(session_id)
+            final_res = calc(central_session_data.get('components', {}).get('gaze_tracking', {}), saliency_map)
 
         logger.info(f"Final result: {final_res}")
         logger.info("Sending gaze data to aggregator")

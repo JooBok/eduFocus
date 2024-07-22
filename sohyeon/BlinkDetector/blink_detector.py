@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 SESSION_SERVICE_URL = "http://session-service"
+blink_detectors = {}
 #####################################################################################################################################
 class BlinkDetector:
     def __init__(self, ear_threshold=0.25, consecutive_frames=3,
@@ -229,6 +230,12 @@ def send_result(final_concentration_score, video_id, ip_address):
     except requests.RequestException as e:
         logger.error(f"Request failed when sending result: {e}")
 ######################################### 세션 관리 #############################################################
+def get_or_create_blink_detector(session_id):
+    if session_id not in blink_detectors:
+        blink_detectors[session_id] = BlinkDetector()
+        blink_detectors[session_id].initialize_mp_face_mesh()
+    return blink_detectors[session_id]
+
 class Session:
     def __init__(self):
         self.blink_detector = BlinkDetector()
@@ -273,15 +280,15 @@ def get_session(session_id):
             return blink_data
         elif response.status_code == 404:
             logger.warning(f"Session not found. Creating new session for {session_id}")
-            new_session = {}
             create_session(session_id)
-            return new_session
+            return {}
         else:
             logger.error(f"Failed to get session. Status code: {response.status_code}, Response: {response.text}")
             return {}
     except requests.RequestException as e:
         logger.error(f"Request failed when getting session: {e}")
         return {}
+
 def update_session(session_id, frame_number, blink_data):
     try:
         update_data = {
@@ -306,6 +313,7 @@ def update_session(session_id, frame_number, blink_data):
             logger.error(f"Failed to update session. Status code: {response.status_code}, Response: {response.text}")
     except requests.RequestException as e:
         logger.error(f"Request failed when updating session: {e}")
+
 def create_session(session_id):
     try:
         create_data = {
@@ -336,8 +344,7 @@ def blink():
         return jsonify({"status": "error", "message": "Missing data"}), 400
 
     session_id = f"{ip_address}_{video_id}"
-    blink_detector = BlinkDetector()
-    blink_detector.initialize_mp_face_mesh()
+    blink_detector = get_or_create_blink_detector(session_id)
 
     if not is_last_frame:
         frame_base64 = data['frame']
@@ -368,7 +375,7 @@ def blink():
     else:
         logger.info("Processing last frame...")
         session_data = get_session(session_id)
-        blink_data = session_data.get('components', {}).get('blink_detection', {})
+        blink_data = session_data
         
         if blink_data:
             total_concentration = sum(frame['concentration'] for frame in blink_data.values())
@@ -379,6 +386,9 @@ def blink():
             final_concentration_score = 0
 
         send_result(final_concentration_score, video_id, ip_address)
+        
+        if session_id in blink_detectors:
+            del blink_detectors[session_id]
         
         return jsonify({"status": "success", "message": "Video processing completed", "final_concentration_score": final_concentration_score}), 200
 
