@@ -2,4 +2,7 @@ venv
 *milkt
 *contents
 .env
+test_user
+test.ipynb
+output
 __pycache__

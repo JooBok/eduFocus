@@ -121,17 +121,17 @@ class pySaliencyMap:
             farne_poly_n = pySaliencyMapDefs.farne_poly_n
             farne_poly_sigma = pySaliencyMapDefs.farne_poly_sigma
             farne_flags = pySaliencyMapDefs.farne_flags
-            flow = cv2.calcOpticalFlowFarneback(\
-                prev = self.prev_frame, \
-                next = I8U, \
-                pyr_scale = farne_pyr_scale, \
-                levels = farne_levels, \
-                winsize = farne_winsize, \
-                iterations = farne_iterations, \
-                poly_n = farne_poly_n, \
-                poly_sigma = farne_poly_sigma, \
-                flags = farne_flags, \
-                flow = None \
+            flow = cv2.calcOpticalFlowFarneback(
+                prev = self.prev_frame,
+                next = I8U,
+                pyr_scale = farne_pyr_scale,
+                levels = farne_levels,
+                winsize = farne_winsize,
+                iterations = farne_iterations,
+                poly_n = farne_poly_n,
+                poly_sigma = farne_poly_sigma,
+                flags = farne_flags,
+                flow = None
             )
             flowx = flow[...,0]
             flowy = flow[...,1]
@@ -254,7 +254,7 @@ class pySaliencyMap:
         # 정규화
         normalizedSM = self.SMRangeNormalize(SMMat)
         normalizedSM2 = normalizedSM.astype(np.float32)
-        smoothedSM = cv2.bilateralFilter(normalizedSM2, 7, 3, 1.55)
+        smoothedSM = cv2.bilateralFilter(normalizedSM2, 7, 3, 1.55)  # 양방향필터(이미지, 필터링에 사용될 픽셀의 거리, 색 공간에서 필터의 표준 편차, 좌표 공간에서 필터의 표준 편차)
         self.SM = cv2.resize(smoothedSM, (width,height), interpolation=cv2.INTER_NEAREST)
         # 반환
         return self.SM
@@ -276,13 +276,13 @@ class pySaliencyMap:
         binarized_SM = self.SMGetBinarizedSM(src)
         # GrabCut
         img = src.copy()
-        mask =  np.where((binarized_SM!=0), cv2.GC_PR_FGD, cv2.GC_PR_BGD).astype('uint8')
+        mask =  np.where((binarized_SM!=0), cv2.GC_PR_FGD, cv2.GC_PR_BGD).astype('uint8')  # FGD: 아마도 전경(3), # BGD: 아마도 배경(2)
         bgdmodel = np.zeros((1,65),np.float64)
         fgdmodel = np.zeros((1,65),np.float64)
         rect = (0,0,1,1)  # 더미
         iterCount = 1
-        cv2.grabCut(img, mask=mask, rect=rect, bgdModel=bgdmodel, fgdModel=fgdmodel, iterCount=iterCount, mode=cv2.GC_INIT_WITH_MASK)
+        cv2.grabCut(img, mask=mask, rect=rect, bgdModel=bgdmodel, fgdModel=fgdmodel, iterCount=iterCount, mode=cv2.GC_INIT_WITH_MASK)  # GC_INT_WITH_MASK: mask에 지정한 값을 기준으로 그랩컷 수행
         # 후처리
         mask_out = np.where((mask==cv2.GC_FGD) + (mask==cv2.GC_PR_FGD), 255, 0).astype('uint8')
-        output = cv2.bitwise_and(img,img,mask=mask_out)
+        output = cv2.bitwise_and(img,img,mask=mask_out)  # mask_out 영역에서 공통으로 겹치는 부분 출력
         return output

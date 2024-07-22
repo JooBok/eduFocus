@@ -10,6 +10,6 @@ spec:
   accessModes:
   - ReadWriteMany
   nfs:
-    server: 172.24.97.194  # WSL2의 NFS 서버 IP 주소
-    path: /home/fp/eduFocus/bok/kubernetes/save_saliency/saliency_contents
+    server: 172.28.42.75  # WSL2의 NFS 서버 IP 주소
+    path: /home/bok/eduFocus/bok/kubernetes/save_saliency/saliency_contents
   storageClassName: mongodb-storage
