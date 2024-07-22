@@ -44,7 +44,7 @@ https://kafka.apache.org/downloads</br>
 - **Python 버전 3.11.5**에서 코드가 작성되고 실행되었음.
 ><h2>실행 - API호출 및 데이터 스트리밍</h2>
 - Producer_ipwebcam.py 코드 실행
-- Powershell 에서 api 호출시에는 ``` $headers = @{
+- Powershell 에서 api 호출시에는 ` $headers = @{
      "Content-Type" = "application/json"
  }
  $body = @{
@@ -52,7 +52,7 @@ https://kafka.apache.org/downloads</br>
      max_frames = 원하는 최종프레임값 지정(초당 20프레임 데이터 전송 구성됨)
      ip_address = "10.41.0.154(ipwebcam애플리케이션 ip주소)" 
  } | ConvertTo-Json
- Invoke-RestMethod -Uri http://localhost:5000/start_stream -Method Post -Headers $headers -Body $body  ```입력</br>
+ Invoke-RestMethod -Uri http://localhost:5000/start_stream -Method Post -Headers $headers -Body $body`입력</br>
  - 윈도우 CMD에서 api 호출 시에는 `curl -X POST http://localhost:5000/start_stream ^
      -H "Content-Type: application/json" ^
      -d "{\"video_id\": \"원하는 video_id 지정\", \"max_frames\": 원하는 최종프레임값 지정, \"ip_address\": \"ipwebcam 앱 로컬 주소\"}"
@@ -70,3 +70,10 @@ wsl 에서 `vim ./config/server.properties` 실행해서 변수를 직접 설정
 주석으로 처리되어 있는 **listeners=PLAINTEXT://** 을 listeners=PLAINTEXT://0.0.0.0:9092 로 수정</br>
 **num.partitions**를 num.partitions=1로 수정</br>
 **advertised.listeners=PLAINTEXT:** 를 advertised.listeners=PLAINTEXT://localhost:9092로 수정이 이미 되어 있다면 주석 해제만 하면 됨.</br>
+
+<h2> 결과 </h2>
+
+라이브 동영상이 프레임 단위로 나뉘어짐.</br>
+현재 경로에 .json 폴더가 생김.</br>
+폴더 안에 프레임 단위로 나뉜 프레임 이미지가 json형식에 맞게 저장됨.</br>
+json형식의 파일의 데이터가 gaze,blink,emotion 모델로 전송됨.(이후의 모델에서 base64 형태로 저장된 이미지를 디코딩하면서 활용할 것임.)
