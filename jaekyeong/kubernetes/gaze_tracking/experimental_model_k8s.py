@@ -7,9 +7,6 @@ import mediapipe as mp
 import numpy as np
 from threading import Lock
 
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
-
 from flask import Flask, request, jsonify
 from scipy.spatial.transform import Rotation
 from pymongo import MongoClient
@@ -17,18 +14,6 @@ from pymongo import MongoClient
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-### api 통신 재시도 ###
-retry_strategy = Retry(
-    total=3,
-    status_forcelist=[429, 500, 502, 503, 504],
-    allowed_methods=["HEAD", "GET", "OPTIONS", "POST", "PUT"],
-    backoff_factor=1
-)
-adapter = HTTPAdapter(max_retries=retry_strategy)
-http = requests.Session()
-http.mount("https://", adapter)
-http.mount("http://", adapter)
 
 AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 SESSION_SERVICE_URL = "http://session-service"
@@ -112,14 +97,16 @@ class GazeSession:
         return session
 
 def get_session(session_id):
-    try:
-        response = http.get(f"{SESSION_SERVICE_URL}/get_session/{session_id}", timeout=5)
-        response.raise_for_status()
+    response = requests.get(f"{SESSION_SERVICE_URL}/get_session/{session_id}")
+    if response.status_code == 200:
         session_data = response.json()
         gaze_data = session_data['components'].get('gaze_tracking', {})
         return GazeSession.from_dict(gaze_data)
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to get session: {e}")
+    elif response.status_code == 404:
+        logger.warning(f"Session not found. Creating new session for {session_id}")
+        return GazeSession()
+    else:
+        logger.error(f"Failed to get session. Status code: {response.status_code}, Response: {response.text}")
         return GazeSession()
 
 def update_session(session_id, gaze_session):
@@ -127,12 +114,14 @@ def update_session(session_id, gaze_session):
         "component": "gaze_tracking",
         "data": gaze_session.to_dict()
     }
-    try:
-        response = http.put(f"{SESSION_SERVICE_URL}/update_session/{session_id}", json=update_data, timeout=5)
-        response.raise_for_status()
+    response = requests.put(f"{SESSION_SERVICE_URL}/update_session/{session_id}", json=update_data)
+    if response.status_code == 200:
         logger.info(f"Successfully updated session for {session_id}")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to update session: {e}")
+    elif response.status_code == 404:
+        logger.warning(f"Session not found when updating. Creating new session for {session_id}")
+        create_session(session_id, gaze_session)
+    else:
+        logger.error(f"Failed to update session. Status code: {response.status_code}, Response: {response.text}")
 
 def create_session(session_id, gaze_session):
     create_data = {
@@ -141,12 +130,12 @@ def create_session(session_id, gaze_session):
             "gaze_tracking": gaze_session.to_dict()
         }
     }
-    try:
-        response = http.post(f"{SESSION_SERVICE_URL}/create_session", json=create_data, timeout=5)
-        response.raise_for_status()
+    response = requests.post(f"{SESSION_SERVICE_URL}/create_session", json=create_data)
+    if response.status_code == 201:
         logger.info(f"Successfully created new session for {session_id}")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to create session: {e}")
+    else:
+        logger.error(f"Failed to create session. Status code: {response.status_code}, Response: {response.text}")
+
 ################################# GBR 모델 인풋 만드는 class, 함수 #################################
 class GazeBuffer:
     def __init__(self, buffer_size=3, smoothing_factor=0.3):
@@ -313,12 +302,10 @@ def send_result(final_result, video_id, ip_address):
         "ip_address": ip_address,
         "model_type": "gaze"
     }
-    try:
-        response = http.post(AGGREGATOR_URL, json=data, timeout=5)
-        response.raise_for_status()
-        logger.info("Successfully sent result to aggregator")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to send result: {e}")
+    response = requests.post(AGGREGATOR_URL, json=data)
+
+    if response.status_code != 200:
+        print(f"Failed to send result: {response.text}")
 ################################## main code ##################################
 @app.route('/gaze', methods=['POST'])
 def process_frame():
@@ -346,11 +333,12 @@ def process_frame():
             gaze_session.final_result[frame_num] = result
 
         update_session(session_id, gaze_session)
+        return jsonify({"status": "success", "message": "Frame processed"}), 200
 
     else:
         saliency_map = extract_saliencyMap(video_id)
         start_time = time.time()
-        timeout = 5        
+        timeout = 5 
         try:
             while time.time() - start_time <= timeout:
                 final_session = get_session(session_id)
@@ -359,8 +347,8 @@ def process_frame():
                     break
                 time.sleep(0.1)
             else:
-                raise TimeoutError("Not all frames processed")
-
+                raise TimeoutError("Not all frames processed within 5 seconds")
+        
         except TimeoutError as e:
             logger.warning(f"Timeout occurred: {e}. Proceeding with available data.")
             final_session = get_session(session_id)
@@ -368,7 +356,6 @@ def process_frame():
 
         logger.info(f"Final result: {final_res}")
         logger.info("Sending gaze data to aggregator")
-
         send_result(final_res, video_id, ip_address)
         
         return jsonify({"status": "success", "message": "Video processing completed"}), 200

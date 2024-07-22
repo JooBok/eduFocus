@@ -1,10 +1,8 @@
 from flask import Flask, request, jsonify
 from analysis_server import analysis
-import cv2, requests, base64, logging, time
+import cv2, requests, base64, logging
 import numpy as np
-
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
+import redis, pickle
 
 app = Flask(__name__)
 ana = analysis()
@@ -12,29 +10,16 @@ ana = analysis()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-### api 통신 재시도 ###
-retry_strategy = Retry(
-    total=3,
-    status_forcelist=[429, 500, 502, 503, 504],
-    allowed_methods=["HEAD", "GET", "OPTIONS", "POST", "PUT"],
-    backoff_factor=1
-)
-adapter = HTTPAdapter(max_retries=retry_strategy)
-http = requests.Session()
-http.mount("https://", adapter)
-http.mount("http://", adapter)
-
 AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 SESSION_SERVICE_URL = "http://session-service"
 #################################### Session ##################################
 def get_session(session_id):
-    try:    
-        response = http.get(f"{SESSION_SERVICE_URL}/get_session/{session_id}", timeout=5)
-        response.raise_for_status()
+    response = requests.get(f"{SESSION_SERVICE_URL}/get_session/{session_id}")
+    if response.status_code == 200:
         session_data = response.json()
         return session_data['components'].get('emotion_analysis', {})
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to get session: {e}")
+    else:
+        logger.error(f"Failed to get session: {response.text}")
         return {}
 
 def update_session(session_id, frame_num, result):
@@ -42,12 +27,10 @@ def update_session(session_id, frame_num, result):
         "component": "emotion_analysis",
         "data": {str(frame_num): result}
     }
-    try:
-        response = http.put(f"{SESSION_SERVICE_URL}/update_session/{session_id}", json=update_data)
-        response.raise_for_status()
-        logger.info(f"Successfully updated session for {session_id}")
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Failed to update session: {e}")
+    response = requests.put(f"{SESSION_SERVICE_URL}/update_session/{session_id}", json=update_data)
+    if response.status_code != 200:
+        logger.error(f"Failed to update session: {response.text}")
+
 ##############################################################################
 def calc(final_result):
     total_frames = len(final_result)
@@ -80,7 +63,6 @@ def analyze_frame():
     last_frame = data['last_frame']
     ip_address = data['ip_address']
 
-
     if not last_frame:
         frame_file = data['frame']
         frame_file = base64.b64decode(frame_file)
@@ -92,30 +74,15 @@ def analyze_frame():
         if result is not None:
             update_session(session_id, frame_num, result)
         logging.info(f"{ip_address} {video_id} frame {frame_num} processed")
-
+        return jsonify({"status": "success", "message": "Frame processed"}), 200
     else:
-        start_time = time.time()
-        timeout = 5        
-        try:
-            while time.time() - start_time <= timeout:
-                session_data = get_session(session_id)
-                if len(session_data) == frame_num:
-                    final_res = calc(session_data)
-                    break
-                time.sleep(0.1)
-            else:
-                raise TimeoutError("Not all frames processed")
-
-        except TimeoutError as e:
-            logger.warning(f"Timeout occurred: {e}. Proceeding with available data.")
-            session_data = get_session(session_id)
-            final_res = calc(session_data)
-
-        logger.info(f"Final result: {final_res}")
-        logger.info("Sending emotion data to aggregator")
+        session_data = get_session(session_id)
+        final_res = calc(session_data)
+        logging.info(f"\n++++++++++++++++++++++++\nFinal Result: {final_res}\n++++++++++++++++++++++++")
 
         send_result(final_res, video_id, ip_address)
-
+        logging.info(f"\n=========================\nsend emotion data to aggregator\n=========================")
+        
         return jsonify({"status": "success", "message": "Video processing completed", "final_result": final_res}), 200
 
 

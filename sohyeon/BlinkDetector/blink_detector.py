@@ -310,7 +310,7 @@ def create_session(session_id, session):
                 "blink_detection": session.to_dict()
             }
         }
-        response = requests.post(f"{SESSION_SERVICE_URL}/create_session", json=create_data)
+        response = requests.post(f"{SESSION_SERVICE_URL}/blink_session", json=create_data)
         logger.debug(f"Create session response: {response.status_code}, {response.text}")
         if response.status_code == 201:
             logger.info(f"Successfully created new session for {session_id}")
