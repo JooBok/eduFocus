@@ -5,12 +5,14 @@ import numpy as np
 from threading import Lock
 from flask import Flask, request, jsonify
 
+import redis, pickle
+
 app = Flask(__name__)
+redis_client = redis.Redis(host='redis-service', port=6379, db=2)
+
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
-SESSION_SERVICE_URL = "http://session-service"
 #####################################################################################################################################
 class BlinkDetector:
     def __init__(self, ear_threshold=0.25, consecutive_frames=3,
@@ -217,6 +219,8 @@ class BlinkDetector:
     
 
 ######################################## 결과 전송 ############################################################
+AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
+
 def send_result(final_concentration_score, video_id, ip_address):
     data = {
         "video_id": video_id,
@@ -228,38 +232,57 @@ def send_result(final_concentration_score, video_id, ip_address):
 
     if response.status_code != 200:
         print(f"Failed to send result: {response.text}")
+
+
 ######################################### 세션 관리 #############################################################
-def get_session(session_id):
-    response = requests.get(f"{SESSION_SERVICE_URL}/get_session/{session_id}")
-    if response.status_code == 200:
-        session_data = response.json()
-        blink_data = session_data['components'].get('blink_detection', {})
-        return blink_data
-    else:
-        logger.error(f"Failed to get session: {response.text}")
+sessions = {}
+
+class Session:
+    def __init__(self):
+        self.blink_detector = BlinkDetector()
+        self.blink_detector.initialize_mp_face_mesh()
+        self.total_concentration = 0
+        self.frame_count = 0
+        self.start_frame = 0
+        self.end_frame = None
+        self.total_concentration_scores = []
+
+    def to_dict(self):
         return {
-            'blink_detector': BlinkDetector(),
-            'total_concentration': 0,
-            'frame_count': 0,
-            'total_concentration_scores': [],
-            'end_frame': None
+            "blink_detector": self.blink_detector.to_dict(),
+            "total_concentration": self.total_concentration,
+            "frame_count": self.frame_count,
+            "start_frame": self.start_frame,
+            "end_frame": self.end_frame,
+            "total_concentration_scores": self.total_concentration_scores,
         }
 
-def update_session(session_id, session_data):
-    update_data = {
-        "component": "blink_detection",
-        "data": session_data
-    }
-    response = requests.put(f"{SESSION_SERVICE_URL}/update_session/{session_id}", json=update_data)
-    if response.status_code != 200:
-        logger.error(f"Failed to update session: {response.text}")
+    @staticmethod
+    def from_dict(data):
+        session = Session()
+        session.blink_detector = BlinkDetector.from_dict(data["blink_detector"])
+        session.total_concentration = data["total_concentration"]
+        session.frame_count = data["frame_count"]
+        session.start_frame = data["start_frame"]
+        session.end_frame = data["end_frame"]
+        session.total_concentration_scores = data["total_concentration_scores"]
+        return session
+
+def get_session(session_key):
+    session_data = redis_client.get(session_key)
+    if session_data:
+        return Session.from_dict(pickle.loads(session_data))
+    return Session()
+
+def save_session(session_key, session):
+    redis_client.set(session_key, pickle.dumps(session.to_dict()))
+    
 ######################################### api 엔드포인트 정의 #########################################################
 @app.route('/blink', methods=['POST'])
 def blink():
     # 폼 데이터에서 필요한 필드 가져오기
     data = request.json
 
-    session_id = data['session_id']
     video_id = data['video_id']
     ip_address = data['ip_address']
     frame_number = data['frame_number']
@@ -276,39 +299,41 @@ def blink():
     frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
     # 세션 키 생성
-    session_data = get_session(session_id)
-    blink_detector = session_data['blink_detector']
+    session_key = f"{ip_address}_{video_id}"
+    session = get_session(session_key)
 
     if not is_last_frame:
         print("Processing frame...")
+
         # 깜빡임 감지
-        left_ear, right_ear, blink_count, concentration, face_landmarks = blink_detector.detect_blink(frame)
+        left_ear, right_ear, blink_count, concentration, face_landmarks = session.blink_detector.detect_blink(frame)
         
         # 각 변수의 값을 로그로 기록
         logging.info(f"left_ear: {left_ear}, right_ear: {right_ear}, blink_count: {blink_count}, concentration: {concentration}, face_landmarks: {face_landmarks}")
 
         # concentration 값을 로그에 기록
         logging.info(f"====================\nConcentration: {concentration}\n====================")
-
-
+        
         # 집중도 데이터 업데이트
         if face_landmarks is not None:
             avg_ear = (left_ear + right_ear) / 2.0
-            session_data['total_concentration'] = session_data.get('total_concentration', 0) + concentration
-            session_data['frame_count'] = session_data.get('frame_count', 0) + 1
-            session_data['total_concentration_scores'] = session_data.get('total_concentration_scores', []) + [concentration]
-        
+            session.total_concentration += concentration
+            session.frame_count += 1
+            session.total_concentration_scores.append(concentration)
+
         # 세션 저장
-        update_session(session_id, session_data)
+        save_session(session_key, session)
         
         logging.info(f"{ip_address} {video_id} {concentration} run succeed")
+
         return jsonify({"status": "success", "message": "Frame processed"}), 200
+
     else:
         print("Processing last frame...")
         # 최종 집중도 계산 및 출력
-        session_data['end_frame'] = frame_number
-        if session_data['frame_count'] > 0:
-            average_concentration = session_data['total_concentration'] / session_data['frame_count']
+        session.end_frame = frame_number
+        if session.frame_count > 0:
+            average_concentration = session.total_concentration / session.frame_count
             concentration_percentage = average_concentration * 100
         else:
             concentration_percentage = 0
@@ -317,15 +342,19 @@ def blink():
         normalized_concentration = concentration_percentage
 
         # 시간 가중치 적용 및 최종 집중 점수 계산
-        total_minutes = session_data['frame_count'] / (20 * 60)
+        total_minutes = session.frame_count / (20 * 60)
         weightings = np.linspace(1, 0.5, max(1, int(total_minutes)))
         concentration_scores = [normalized_concentration * w for w in weightings]
         final_concentration_score = np.mean(concentration_scores)
 
         # 최종 결과 전송
         send_result(final_concentration_score, video_id, ip_address)
-
+        redis_client.delete(session_key)
         return jsonify({"status": "success", "message": "Video processing completed", "final_concentration_score": final_concentration_score}), 200
+    
+    return jsonify({"status": "success", "message": "Frame processed"}), 200
+
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
