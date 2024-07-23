@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+
+metadata:
+  name: gaze-tracking
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gaze-tracking
+  template:
+    metadata:
+      labels:
+        app: gaze-tracking
+    spec:
+      containers:
+      - name: gaze-tracking
+        image: pepi10/gaze-tracking-v2-test:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: SESSION_SERVICE_URL
+          value: "http://session-service"
+        - name: MONGO_URI
+          valueFrom:
+            secretKeyRef:
+              name: mongo-secret
+              key: mongo-uri
+        - name: MONGO_DB
+          value: "saliency_db"
+        - name: AGGREGATOR_URL
+          value: "http://result-aggregator-service/aggregate"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gaze-tracking-service
+spec:
+  selector:
+    app: gaze-tracking
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 5000
+      nodePort: 30000
+  type: NodePort
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongo-secret
+type: Opaque
+stringData:
+  mongo-uri: mongodb://root:root@mongodb:27017/saliency_db?authSource=admin
