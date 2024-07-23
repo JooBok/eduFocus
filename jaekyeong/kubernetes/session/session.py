@@ -1,9 +1,11 @@
 from flask import Flask, request, jsonify
-import redis, json
+import redis, json, logging
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
 redis_client = redis.Redis(host = "redis-service", port = 6379)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 ### 세션 파기 (대기시간 5분) ###
 SESSION_EXPIRY = timedelta(minutes = 5)
@@ -12,9 +14,9 @@ SESSION_EXPIRY = timedelta(minutes = 5)
 def mk_session():
     ### api gw로 부터 받는 data ###
     data = request.json
-
+    logger.info(f" session mk-session -> data: {data}")
     session_id = data["session_id"]
-    ip_addr = data["ip_address"]
+    ip_address = data["ip_address"]
     video_id = data["video_id"]
 
     ### session check ###
@@ -23,7 +25,7 @@ def mk_session():
 
     ### session make ###
     session_data = {
-            "ip_address": ip_addr,
+            "ip_address": ip_address,
             "video_id": video_id,
             "created_at": datetime.now().isoformat(),
             "last_accessed": datetime.now().isoformat(),
@@ -50,33 +52,13 @@ def get_session(session_id):
         return jsonify(json.loads(session_data)), 200
     return jsonify({'error': 'Session Not Found'}), 404
 
-@app.route('/update_session/<session_id>', methods = ['PUT'])
-def update_session(session_id):
-    """
-    session에 gaze, blink, emotion의 data 넣는 함수와 api endpoint
-    """
-    component = request.json.get('component')
-    data = request.json.get('data')
-
-    session_data = redis_client.get(f"session:{session_id}")
-    if session_data:
-        session = json.loads(session_data)
-        session['components'][component].update(data)
-        session['last_accessed'] = datetime.now().isoformat()
-
-        redis_client.setex(
-                f"session:{session_id}",
-                int(SESSION_EXPIRY.total_seconds()),
-                json.dumps(session))
-
-        return jsonify({'message': 'Session Updated Successfully'}), 200
-    return jsonify({'error': 'Session Not Found'}), 404
-
 @app.route('/update_session/<session_id>', methods=['PUT'])
 def update_session(session_id):
+    
     """
     session에 gaze, blink, emotion의 data 넣는 함수와 api endpoint
     """
+    
     component = request.json.get('component')
     data = request.json.get('data', {})
 

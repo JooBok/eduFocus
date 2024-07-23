@@ -1,7 +1,9 @@
 from flask import Flask, request, jsonify
-import requests, uuid
+import requests, uuid, logging
 
 app = Flask(__name__)
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 SESSION_SERVICE_URL = "http://session-service"
 MODEL_URLS = {
@@ -38,19 +40,35 @@ def process_frame():
     session_id = generate_session(ip_addr, video_id)
 
     ### Ensure session id exists ###
-    create_session(session_id, ip_addr, video_id)
+    try:
+        create_session(session_id = session_id, ip_address = ip_addr, video_id = video_id)
+    except Exception as e:
+        logger.error(f"Failed to create session: {str(e)}")
+        return jsonify({"Error": "Failed to create session"}), 500
 
     data["session_id"] = session_id
 
     ### send data to model ###
-    for model, url in MODEL_URLS.item():
-        response = requests.post(url, json = data)
-        if response.status_code != 200:
-            return jsonify({"Error": f"Error send data to {model} - api gw"}), 500
+    errors = []
+    for model, url in MODEL_URLS.items():
+        try:
+            response = requests.post(url, json=data)
+            if response.status_code != 200:
+                logger.error(f"Error sending data to {model} - api gw. Status code: {response.status_code}")
+                errors.append(f"Error sending data to {model}")
+            else:
+                logger.info(f"Sent data to {model} - api gw OK")
+        except requests.RequestException as e:
+            logger.error(f"Error sending data to {model} - api gw: {str(e)}")
+            errors.append(f"Error sending data to {model}")
+
+    if errors:
+        return jsonify({"Errors": errors}), 500
 
     if last_frame:
         return jsonify({"message": "Last frame - api gw"}), 200
-    return jsonify({"message": "send data successfully - api gw"}), 200
+
+    return jsonify({"message": "Sent data successfully to all models - api gw"}), 200
 
 if __name__ == '__main__':
     app.run(host = '0.0.0.0', port = 5000)

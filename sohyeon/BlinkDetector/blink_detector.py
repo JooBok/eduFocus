@@ -335,6 +335,7 @@ def create_session(session_id):
 def blink():
     data = request.json
 
+    session_id = data['session_id']
     video_id = data['video_id']
     ip_address = data['ip_address']
     frame_number = data['frame_number']
@@ -343,7 +344,6 @@ def blink():
     if not video_id or frame_number is None:
         return jsonify({"status": "error", "message": "Missing data"}), 400
 
-    session_id = f"{ip_address}_{video_id}"
     blink_detector = get_or_create_blink_detector(session_id)
 
     if not is_last_frame:
