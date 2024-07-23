@@ -8,8 +8,8 @@
 ### kubernetes/
 * 쿠버네티스에 사용할 이미지 빌드용 디렉토리입니다.
 
-> session -> central-session 이미지 빌드 디렉토리    
-> api_gateway -> api-gw 이미지 빌드 디렉토리    
-> gaze_tracking -> gaze-tracking 이미지 빌드 디렉토리    
-> emotion_analysis -> emotion-analysis 이미지 빌드 디렉토리    
-> aggregator -> result-aggregator 이미지 빌드 디렉토리
+> session\ -> central-session 이미지 빌드 디렉토리    
+> api_gateway\ -> api-gw 이미지 빌드 디렉토리    
+> gaze_tracking\ -> gaze-tracking 이미지 빌드 디렉토리    
+> emotion_analysis\ -> emotion-analysis 이미지 빌드 디렉토리    
+> aggregator\ -> result-aggregator 이미지 빌드 디렉토리
