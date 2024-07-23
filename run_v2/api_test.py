@@ -8,7 +8,7 @@ def encode(path):
     frame_base64 = base64.b64encode(buffer).decode('utf-8')
     return frame_base64
 
-gw_uri = 'http://192.168.49.2:32678/process'
+gw_uri = 'http://192.168.49.2:30942/process'
 
 for _ in range(20):
     if _ < 10:

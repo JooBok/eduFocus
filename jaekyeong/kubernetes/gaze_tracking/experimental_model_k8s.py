@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 SESSION_SERVICE_URL = "http://session-service"
-gaze_sessions = {}
+gaze_detectors = {}
 ################################## Mongo setting ##################################
 # MONGO_URI = 'mongodb://mongodb-service:27017'
 MONGO_URI = 'mongodb://root:root@mongodb:27017/saliency_db?authSource=admin'
@@ -67,8 +67,13 @@ def extract_saliencyMap(video_id):
 
     return extracted_data
 ################################### Session ###################################
-class GazeSession:
+class GazeDetector:
     def __init__(self, session_id):
+        self.face_mesh = mp.solutions.face_mesh.FaceMesh(
+            refine_landmarks=True,
+            min_detection_confidence=0.7,
+            min_tracking_confidence=0.7
+        )
         self.session_id = session_id
         self.gaze_buffer = GazeBuffer()
         self.gaze_fixation = GazeFixation()
@@ -76,14 +81,61 @@ class GazeSession:
         self.prev_gaze = None
         self.sequence_length = 10
 
-    def add_frame_data(self, frame_number, gaze_data):
-        # 로컬 데이터 처리
-        self.gaze_buffer.add(gaze_data)
-        self.gaze_fixation.update(gaze_data)
-        self.gaze_sequence.append(gaze_data)
-        if len(self.gaze_sequence) > self.sequence_length:
-            self.gaze_sequence.pop(0)
-        self.prev_gaze = gaze_data
+    def process_single_frame(self, frame):
+        image = cv2.flip(frame, 1)
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        results = self.face_mesh.process(image_rgb)
+
+        h, w = image.shape[:2]
+
+        if results.multi_face_landmarks:
+            for face_landmarks in results.multi_face_landmarks:
+                left_iris = get_center(face_landmarks.landmark[468:474])[:3]
+                right_iris = get_center(face_landmarks.landmark[473:479])[:3]
+                left_eye = get_center(face_landmarks.landmark[33:42])[:3]
+                right_eye = get_center(face_landmarks.landmark[263:272])[:3]
+
+                estimated_distance = calculate_distance([left_iris, right_iris], image.shape[0])
+
+                left_gaze = estimate_gaze(left_eye, left_iris, estimated_distance)
+                right_gaze = estimate_gaze(right_eye, right_iris, estimated_distance)
+
+                head_rotation = estimate_head_pose(face_landmarks)
+
+                left_gaze_corrected = correct_gaze_vector(left_gaze, head_rotation)
+                right_gaze_corrected = correct_gaze_vector(right_gaze, head_rotation)
+
+                combined_gaze = calculate_combined_gaze(left_gaze_corrected, right_gaze_corrected, head_rotation, estimated_distance)
+
+                self.gaze_sequence.append(combined_gaze)
+
+                if len(self.gaze_sequence) > self.sequence_length:
+                    self.gaze_sequence.pop(0)
+
+                if len(self.gaze_sequence) == self.sequence_length:
+                    gaze_input = np.array(self.gaze_sequence).flatten().reshape(1, -1)
+                    with model_lock:
+                        predicted_x = model_x.predict(gaze_input)[0]
+                        predicted_y = model_y.predict(gaze_input)[0]
+                    predicted_gaze = np.array([predicted_x, predicted_y])
+                    
+                    self.gaze_buffer.add(predicted_gaze)
+                    smoothed_gaze = self.gaze_buffer.get_average()
+
+                    filtered_gaze = filter_sudden_changes(smoothed_gaze, self.prev_gaze)
+                    predicted_x, predicted_y = filtered_gaze
+                    self.prev_gaze = filtered_gaze
+
+                    screen_x = int((predicted_x + 1) * w / 2)
+                    screen_y = int((1 - predicted_y) * h / 2)
+
+                    screen_x, screen_y = limit_gaze(screen_x, screen_y, w, h)
+
+                    self.gaze_fixation.update((screen_x, screen_y))
+
+                    return int(screen_x), int(screen_y)
+
+        return None
 
     def to_dict(self):
         return {
@@ -97,18 +149,18 @@ class GazeSession:
 
     @classmethod
     def from_dict(cls, data):
-        session = cls(data['session_id'])
-        session.gaze_buffer = GazeBuffer.from_dict(data.get('gaze_buffer', {}))
-        session.gaze_fixation = GazeFixation.from_dict(data.get('gaze_fixation', {}))
-        session.gaze_sequence = [np.array(gaze) for gaze in data.get('gaze_sequence', [])]
-        session.prev_gaze = np.array(data['prev_gaze']) if data.get('prev_gaze') is not None else None
-        session.sequence_length = data.get('sequence_length', 10)
-        return session
+        detector = cls(data['session_id'])
+        detector.gaze_buffer = GazeBuffer.from_dict(data.get('gaze_buffer', {}))
+        detector.gaze_fixation = GazeFixation.from_dict(data.get('gaze_fixation', {}))
+        detector.gaze_sequence = [np.array(gaze) for gaze in data.get('gaze_sequence', [])]
+        detector.prev_gaze = np.array(data['prev_gaze']) if data.get('prev_gaze') is not None else None
+        detector.sequence_length = data.get('sequence_length', 10)
+        return detector
     
-def get_or_create_gaze_session(session_id):
-    if session_id not in gaze_sessions:
-        gaze_sessions[session_id] = GazeSession(session_id)
-    return gaze_sessions[session_id]
+def get_or_create_gaze_detector(session_id):
+    if session_id not in gaze_detectors:
+        gaze_detectors[session_id] = GazeDetector(session_id)
+    return gaze_detectors[session_id]
 
 def get_session(session_id):
     try:
@@ -353,19 +405,19 @@ def process_frame():
     last_frame = data['last_frame']
     ip_address = data['ip_address']
 
-    gaze_session = get_or_create_gaze_session(session_id)
-    logger.info(f"gaze_session_local : {gaze_session.__dict__}")
+    gaze_detector = get_or_create_gaze_detector(session_id)
+
     if not last_frame: 
         frame_base64 = data['frame']
         frame_data = base64.b64decode(frame_base64)
         nparr = np.frombuffer(frame_data, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        result = process_single_frame(frame, gaze_session)
+        result = gaze_detector.process_single_frame(frame)
 
         logger.info(f"Frame {frame_num} processed. Result: {result}")
-        gaze_session.add_frame_data(frame_num, result)
-        update_session(session_id, frame_num, result)
+        if result:
+            update_session(session_id, frame_num, result)
 
         return jsonify({"status": "success", "message": "Frame processed"}), 200
 
@@ -376,63 +428,11 @@ def process_frame():
         final_res = calc(central_session_data, saliency_map)
         send_result(final_res, video_id, ip_address)
         
+        if session_id in gaze_detectors:
+            del gaze_detectors[session_id]
+        
         return jsonify({"status": "success", "message": "Video processing completed"}), 200
-
-def process_single_frame(frame, gaze_session):
-    image = cv2.flip(frame, 1)
-    image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    results = face_mesh.process(image_rgb)
-
-    h, w = image.shape[:2]
-
-    if results.multi_face_landmarks:
-        for face_landmarks in results.multi_face_landmarks:
-            left_iris = get_center(face_landmarks.landmark[468:474])[:3]
-            right_iris = get_center(face_landmarks.landmark[473:479])[:3]
-            left_eye = get_center(face_landmarks.landmark[33:42])[:3]
-            right_eye = get_center(face_landmarks.landmark[263:272])[:3]
-
-            estimated_distance = calculate_distance([left_iris, right_iris], image.shape[0])
-
-            left_gaze = estimate_gaze(left_eye, left_iris, estimated_distance)
-            right_gaze = estimate_gaze(right_eye, right_iris, estimated_distance)
-
-            head_rotation = estimate_head_pose(face_landmarks)
-
-            left_gaze_corrected = correct_gaze_vector(left_gaze, head_rotation)
-            right_gaze_corrected = correct_gaze_vector(right_gaze, head_rotation)
-
-            combined_gaze = calculate_combined_gaze(left_gaze_corrected, right_gaze_corrected, head_rotation, estimated_distance)
-
-            gaze_session.gaze_sequence.append(combined_gaze)
-
-            if len(gaze_session.gaze_sequence) > gaze_session.sequence_length:
-                gaze_session.gaze_sequence.pop(0)
-
-            if len(gaze_session.gaze_sequence) == gaze_session.sequence_length:
-                gaze_input = np.array(gaze_session.gaze_sequence).flatten().reshape(1, -1)
-                with model_lock:
-                    predicted_x = model_x.predict(gaze_input)[0]
-                    predicted_y = model_y.predict(gaze_input)[0]
-                predicted_gaze = np.array([predicted_x, predicted_y])
-                logger.info(f"\n========================\npredict gaze : {predicted_gaze}\n========================")
-                gaze_session.gaze_buffer.add(predicted_gaze)
-                smoothed_gaze = gaze_session.gaze_buffer.get_average()
-
-                filtered_gaze = filter_sudden_changes(smoothed_gaze, gaze_session.prev_gaze)
-                predicted_x, predicted_y = filtered_gaze
-                gaze_session.prev_gaze = filtered_gaze
-
-                screen_x = int((predicted_x + 1) * w / 2)
-                screen_y = int((1 - predicted_y) * h / 2)
-
-                screen_x, screen_y = limit_gaze(screen_x, screen_y, w, h)
-
-                is_fixation = gaze_session.gaze_fixation.update((screen_x, screen_y))
-
-                return int(screen_x), int(screen_y)
-
-    return None
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+

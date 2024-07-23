@@ -1,5 +1,6 @@
 apiVersion: apps/v1
 kind: Deployment
+
 metadata:
   name: gaze-tracking
 spec:
@@ -26,9 +27,7 @@ spec:
               name: mongo-secret
               key: mongo-uri
         - name: MONGO_DB
-          value: "database_name"
-        - name: MONGO_COLLECTION
-          value: "saliency_map"
+          value: "saliency_db"
         - name: AGGREGATOR_URL
           value: "http://result-aggregator-service/aggregate"
 ---
@@ -43,8 +42,8 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 5000
-      nodePort: 30659
-  type: LoadBalancer
+      nodePort: 30000
+  type: NodePort
 ---
 apiVersion: v1
 kind: Secret
