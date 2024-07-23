@@ -1,15 +1,12 @@
-import time, joblib
-import requests, base64, cv2, logging
-import warnings
-warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf.symbol_database")
-
+from typing import List, Dict, Tuple, Optional, Union, Any
+import time, joblib, requests, base64, cv2, logging, warnings
 import mediapipe as mp
 import numpy as np
 from threading import Lock
-
 from flask import Flask, request, jsonify
 from scipy.spatial.transform import Rotation
 from pymongo import MongoClient
+warnings.filterwarnings("ignore", category=UserWarning, module="google.protobuf.symbol_database")
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -19,18 +16,8 @@ AGGREGATOR_URL = "http://result-aggregator-service/aggregate"
 SESSION_SERVICE_URL = "http://session-service"
 gaze_detectors = {}
 ################################## Mongo setting ##################################
-# MONGO_URI = 'mongodb://mongodb-service:27017'
 MONGO_URI = 'mongodb://root:root@mongodb:27017/saliency_db?authSource=admin'
 MONGO_DB = 'saliency_db'
-# MONGO_COLLECTION = 'contents2'
-################################ mediaPipe setting ################################
-mp_face_mesh = mp.solutions.face_mesh
-face_mesh = mp_face_mesh.FaceMesh(
-    refine_landmarks=True,
-    min_detection_confidence=0.7,
-    min_tracking_confidence=0.7
-)
-mp_drawing = mp.solutions.drawing_utils
 ################################## model setting ##################################
 global model_x, model_y
 model_x = None
@@ -48,7 +35,13 @@ load_models()
 def mongodb_client():
     return MongoClient(MONGO_URI)
 
-def extract_saliencyMap(video_id):
+def extract_saliencyMap(video_id: str) -> List[List[Union[int, np.ndarray]]]:
+    """
+    video_id에 해당하는 saliency map 데이터를 MongoDB에서 추출하는 함수
+
+    :param  -> video_id: 비디오 ID
+    :return -> frame 번호와 saliency map을 포함하는 2차원 리스트
+    """
     client = mongodb_client()
     db = client[MONGO_DB]
     collection = db[video_id]
@@ -81,7 +74,13 @@ class GazeDetector:
         self.prev_gaze = None
         self.sequence_length = 10
 
-    def process_single_frame(self, frame):
+    def process_single_frame(self, frame: np.ndarray) -> Optional[Tuple[int, int]]:
+        """
+        단일 프레임에서 시선 위치를 추정하는 함수 (process_frame에서 사용)
+
+        :param  -> frame: 처리할 이미지 프레임
+        :return -> 추정된 시선 위치 좌표 (x, y) (얼굴이 감지되지 않은 경우 None)
+        """
         image = cv2.flip(frame, 1)
         image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
         results = self.face_mesh.process(image_rgb)
@@ -157,12 +156,24 @@ class GazeDetector:
         detector.sequence_length = data.get('sequence_length', 10)
         return detector
     
-def get_or_create_gaze_detector(session_id):
+def get_or_create_gaze_detector(session_id: str) -> GazeDetector:
+    """
+    session_id에 대한 GazeDetector를 가져오고 없으면 생성하는 함수
+    
+    :param  -> session_id
+    :return -> GazeDetector 인스턴스(세션 별)
+    """
     if session_id not in gaze_detectors:
         gaze_detectors[session_id] = GazeDetector(session_id)
     return gaze_detectors[session_id]
 
-def get_session(session_id):
+def get_session(session_id: str) -> Dict[str, Any]:
+    """
+    session_id에 대한 세션 데이터를 api를 통해 가져오는 함수
+    
+    :param  -> session_id
+    :return -> session data dict
+    """
     try:
         response = requests.get(f"{SESSION_SERVICE_URL}/get_session/{session_id}")
         logger.debug(f"Get session response: {response.status_code}, {response.text}")
@@ -181,7 +192,14 @@ def get_session(session_id):
         logger.error(f"Request failed when getting session: {e}")
         return {}
 
-def update_session(session_id, frame_number, gaze_data):
+def update_session(session_id: str, frame_number: int, gaze_data: Tuple[int, int]) -> None:
+    """
+    세션 api를 통하여 data를 update(append)하는 함수
+
+    :param -> session_id
+    :param -> frame_number
+    :param -> gaze_data: 시선 데이터 (x, y)
+    """
     try:
         update_data = {
             "component": "gaze_tracking",
@@ -207,6 +225,11 @@ def update_session(session_id, frame_number, gaze_data):
         logger.error(f"Request failed when updating session: {e}")
 
 def create_session(session_id: str) -> None:
+    """
+    세션이 없을 경우 새로운 세션을 생성하는 함수
+    
+    :param -> session_id
+    """
     try:        
         create_data = {
             "session_id": session_id,
@@ -311,21 +334,48 @@ class GazeFixation:
         fixation.start_time = data.get('start_time')
         return fixation
 
-def calculate_distance(iris_landmarks, image_height):
+def calculate_distance(iris_landmarks: List[np.ndarray], image_height: int) -> float:
+    """
+    홍채 랜드마크를 기반으로 유클리드 거리를 통해 추정 거리를 계산하는 함수
+    
+    :param  -> iris_landmarks: 홍채 랜드마크 리스트
+    :param  -> image_height
+    :return -> 추정 거리
+    """
     left_iris, right_iris = iris_landmarks
     distance = np.linalg.norm(np.array(left_iris) - np.array(right_iris))
     estimated_distance = (1 / distance) * image_height
     return estimated_distance
 
-def get_center(landmarks):
+def get_center(landmarks: List[mp.framework.formats.landmark.Landmark]) -> np.ndarray:
+    """
+    랜드마크들의 중심점을 계산하는 함수
+
+    :param  -> landmarks: 랜드마크 리스트
+    :return -> 중심점 좌표 (x, y, z)
+    """
     return np.mean([[lm.x, lm.y, lm.z] for lm in landmarks], axis=0)
 
-def estimate_gaze(eye_center, iris_center, estimated_distance):
+def estimate_gaze(eye_center: np.ndarray, iris_center: np.ndarray, estimated_distance: float) -> np.ndarray:
+    """
+    눈 중심과 홍채 중심을 기반으로 시선 방향 벡터를 추정하는 함수
+    
+    :param  -> eye_center: get_center
+    :param  -> iris_center: get_center
+    :param  -> estimated_distance: calculate_distance
+    :return -> 시선 방향 벡터
+    """
     eye_vector = iris_center - eye_center
     gaze_point = eye_center + eye_vector * estimated_distance
     return gaze_point
 
-def estimate_head_pose(face_landmarks):
+def estimate_head_pose(face_landmarks: mp.framework.formats.landmark.Landmark) -> np.ndarray:
+    """
+    얼굴 랜드마크를 기반으로 머리 회전 추정 함수
+    
+    :param  -> face_landmarks: 얼굴 랜드마크
+    :return -> 회전 매트릭스
+    """
     nose = np.array([face_landmarks.landmark[1].x, face_landmarks.landmark[1].y, face_landmarks.landmark[1].z])
     left_eye = np.array([face_landmarks.landmark[33].x, face_landmarks.landmark[33].y, face_landmarks.landmark[33].z])
     right_eye = np.array([face_landmarks.landmark[263].x, face_landmarks.landmark[263].y, face_landmarks.landmark[263].z])
@@ -341,11 +391,27 @@ def estimate_head_pose(face_landmarks):
         rotation_matrix = np.eye(3)
     return rotation_matrix
 
-def correct_gaze_vector(gaze_vector, head_rotation):
+def correct_gaze_vector(gaze_vector: np.ndarray, head_rotation: np.ndarray) -> np.ndarray:
+    """
+    머리 회전을 고려하여 시선 벡터를 보정하는 함수
+    
+    :param  -> gaze_vector: 원본 시선 벡터
+    :param  -> head_rotation: 머리 회전 행렬
+    :return -> 보정된 시선 벡터
+    """
     corrected_gaze = np.dot(head_rotation, gaze_vector)
     return corrected_gaze
 
-def filter_sudden_changes(new_gaze, prev_gaze, max_change_x=15, max_change_y=15):
+def filter_sudden_changes(new_gaze: np.ndarray, prev_gaze: Optional[np.ndarray], max_change_x: float = 15, max_change_y: float = 15) -> np.ndarray:
+    """
+    시선 변화 상한을 정하는 함수
+    
+    :param  -> new_gaze: 새로운 시선 위치
+    :param  -> prev_gaze: 이전 시선 위치
+    :param  -> max_change_x: x축 최대 변화량
+    :param  -> max_change_y: y축 최대 변화량
+    :return -> 시선 좌표
+    """
     if prev_gaze is None:
         return new_gaze
     change_x = abs(new_gaze[0] - prev_gaze[0])
@@ -356,17 +422,42 @@ def filter_sudden_changes(new_gaze, prev_gaze, max_change_x=15, max_change_y=15)
         new_gaze[1] = prev_gaze[1] + (new_gaze[1] - prev_gaze[1]) * (max_change_y / change_y)
     return new_gaze
 
-def limit_gaze(gaze_point_x, gaze_point_y, screen_width, screen_height):
+def limit_gaze(gaze_point_x: float, gaze_point_y: float, screen_width: int, screen_height: int) -> Tuple[float, float]:
+    """
+    시선 위치를 화면 내로 제한하는 함수
+    
+    :param  -> gaze_point_x: 시선 x 좌표
+    :param  -> gaze_point_y: 시선 y 좌표
+    :param  -> screen_width
+    :param  -> screen_height
+    :return -> 시선 좌표
+    """
     gaze_point_x = min(max(gaze_point_x, 0), screen_width - 1)
     gaze_point_y = min(max(gaze_point_y, 0), screen_height - 1)
     return gaze_point_x, gaze_point_y
 
-def calculate_combined_gaze(left_gaze, right_gaze, head_rotation, distance):
+def calculate_combined_gaze(left_gaze: np.ndarray, right_gaze: np.ndarray, head_rotation: np.ndarray, distance: float) -> np.ndarray:
+    """
+    왼쪽 눈과 오른쪽 눈의 시선, 머리 회전, 거리를 결합하여 최종 모델 입력 데이터 생성 함수
+    
+    :param  -> left_gaze: 왼쪽 눈 시선 벡터
+    :param  -> right_gaze: 오른쪽 눈 시선 벡터
+    :param  -> head_rotation: 머리 회전 행렬
+    :param  -> distance: 추정 거리
+    :return -> 모델 input (feature 7개)
+    """
     combined_gaze = (left_gaze + right_gaze) / 2
     head_rotation_euler = Rotation.from_matrix(head_rotation).as_euler('xyz')
     return np.concatenate([combined_gaze, head_rotation_euler, [distance]])
 
-def calc(gaze_points, saliency_map):
+def calc(gaze_points: Dict[str, Tuple[int, int]], saliency_map: List[List[Union[int, np.ndarray]]]) -> float:
+    """
+    시선 위치와 saliency map을 비교하여 점수를 계산하는 함수
+    
+    :param  -> gaze_points: 프레임별 시선 위치 딕셔너리
+    :param  -> saliency_map: saliency map 데이터
+    :return -> 점수(최종 output)
+    """
     count = 0
     total_frames = len(gaze_points)
     logger.info(f"calc -> gaze_points {gaze_points}")
@@ -382,7 +473,14 @@ def calc(gaze_points, saliency_map):
         res = round(res, 4) * 100
     return res
 ################################# Send result #################################
-def send_result(final_result, video_id, ip_address):
+def send_result(final_result: float, video_id: str, ip_address: str) -> None:
+    """
+    최종 output을 aggregator로 전송하는 함수
+    
+    :param -> final_result: 최종 output
+    :param -> video_id
+    :param -> ip_address
+    """
     data = {
         "video_id": video_id,
         "final_score": final_result,
@@ -435,4 +533,3 @@ def process_frame():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-
