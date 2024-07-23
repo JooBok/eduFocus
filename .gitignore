@@ -7,3 +7,6 @@ test.ipynb
 output
 __pycache__
 face_frames/
+garbage/
+dlib
+base64.txt
