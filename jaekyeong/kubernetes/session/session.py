@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 import redis, json, logging
 from datetime import datetime, timedelta
+from typing import Dict, Any, Tuple
 
 app = Flask(__name__)
 redis_client = redis.Redis(host = "redis-service", port = 6379)
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 SESSION_EXPIRY = timedelta(minutes = 5)
 
 @app.route('/mk-session', methods = ['POST'])
-def mk_session():
+def mk_session() -> Tuple[Any, int]:
     ### api gw로 부터 받는 data ###
     data = request.json
     logger.info(f" session mk-session -> data: {data}")
@@ -24,7 +25,7 @@ def mk_session():
         return jsonify({"message": "Session Already Exist"}), 200
 
     ### session make ###
-    session_data = {
+    session_data: Dict[str, Any] = {
             "ip_address": ip_address,
             "video_id": video_id,
             "created_at": datetime.now().isoformat(),
@@ -43,7 +44,7 @@ def mk_session():
     return jsonify({"session_id": session_id}), 201
 
 @app.route('/get_session/<session_id>', methods = ['GET'])
-def get_session(session_id):
+def get_session(session_id: str) -> Tuple[Any, int]:
     """
     session 확인용 함수와 api endpoint
     """
@@ -52,13 +53,11 @@ def get_session(session_id):
         return jsonify(json.loads(session_data)), 200
     return jsonify({'error': 'Session Not Found'}), 404
 
-@app.route('/update_session/<session_id>', methods=['PUT'])
-def update_session(session_id):
-    
+@app.route('/update_session/<session_id>', methods = ['PUT'])
+def update_session(session_id: str) -> Tuple[Any, int]:
     """
     session에 gaze, blink, emotion의 data 넣는 함수와 api endpoint
     """
-    
     component = request.json.get('component')
     data = request.json.get('data', {})
 
