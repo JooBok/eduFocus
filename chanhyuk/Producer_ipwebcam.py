@@ -12,6 +12,7 @@ app = Flask(__name__)
 kafka_topic = 'video-stream'
 kafka_bootstrap_servers = ['localhost:9092']
 
+# kafka 프로듀서 설정
 producer = KafkaProducer(
     bootstrap_servers=kafka_bootstrap_servers,
     api_version=(0, 2, 0),
@@ -28,6 +29,8 @@ producer = KafkaProducer(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('StreamLogger')
 
+# 쓰레드 사용해서 효율성 높임.
+# api 호출 할 때, 변수 설정.
 class StreamThread(threading.Thread):
     def __init__(self, video_id, max_frames, ip_address):
         threading.Thread.__init__(self)
@@ -42,9 +45,10 @@ class StreamThread(threading.Thread):
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 
-        # 프레임 레이트 설정 (예: 30FPS)
+        # 프레임 레이트 설정 (초당 20프레임)
         self.cap.set(cv2.CAP_PROP_FPS, 20)
 
+    # 비디오 스트림이 되지 않을 떄 오류 메시지 출력.
     def run(self):
         if not self.cap.isOpened():
             logger.error("Unable to open video stream.")
@@ -53,6 +57,7 @@ class StreamThread(threading.Thread):
         frame_number = 0
         # last_frame_number = 0
 
+        # 지정한 최대 프레임의 수만큼 스트림.
         try:
             while self.running and frame_number < self.max_frames:
                 ret, frame = self.cap.read()
@@ -65,6 +70,7 @@ class StreamThread(threading.Thread):
                 _, buffer = cv2.imencode('.png', frame)
                 frame_number += 1
 
+                #초당 프레임을 base64형태로 디코딩.
                 frame_base64 = base64.b64encode(buffer).decode('utf-8')
 
                 # if frame_number > self.max_frames:
