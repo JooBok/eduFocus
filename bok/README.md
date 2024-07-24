@@ -63,4 +63,4 @@ kubectl port-forward $MONGO_EXPRESS 8081:8081
 - **4개의 특징맵에 각각 가중치를 부여하여 나온 결과값 합산**
 - **정규화 진행**
 - **노이즈 제거를 위해 양방향 필터 적용**
-### pySaliencyMapDefs.py에서 파라미터 수정하여 컨텐츠별 Saliency map 생성 가능
+> **pySaliencyMapDefs.py에서 파라미터 수정하여 컨텐츠별 Saliency map 생성 가능**
