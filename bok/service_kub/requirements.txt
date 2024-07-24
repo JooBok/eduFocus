@@ -1,4 +1,0 @@
-numpy
-opencv_python
-pymongo
-python-dotenv

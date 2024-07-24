@@ -1,39 +1,60 @@
-# 개인 작업공간
+# MongoDB Setting
+## 1. 데이터 준비
+1. save_saliency/contents/contents1 경로에 컨텐츠 영상 파일(mp4)을 넣는다.
+2. 명령어를 실행하여 mp4파일을 20FPS의 이미지로 변환
+    ```
+    source save_saliency/video_to_image.sh contents1
+    ```
 
-## saliency 디렉터리
-| 파일명              | 설명                                                                 |
-|-------------------|--------------------------------------------------------------------|
-| **docker-compose.yml**| MongoDB와 Mongo-Express 컨테이너로 구성                               |
-| **install_docker.sh**    | Ubuntu에 최신버전의 Docker, Docker-compose를 설치하는 셸 파일                    |
-| **video_to_image.sh** | mp4 파일을 20FPS로 이미지로 저장하는 셸 파일                         |
-| **save.py**           | contents 디렉터리의 모든 이미지(png, jpg)를 saliency map을 그려 MongoDB에 저장하는 파일 |
-| **load.py**           | MongoDB에서 saliency map을 불러오는 파일                              |
-| **pySaliencyMap.py**  | Saliency map을 만드는 함수들이 정의되어 있는 파일                      |
-| **pySaliencyMapDef.py**| Saliency map을 그리기 위한 변수들이 정의되어 있는 파일                |
----
-[**추가로 구성해야 할 내용**]
-- /contents: 컨텐츠가 20FPS의 이미지로 저장된 파일들이 있는 디렉터리
-- .env: MongoDB의 민감정보들
+## 2. Saliency map 생성
+1. 명령어를 실행하여 Saliency map 생성에 필요한 라이브러리 설치
+    ```
+    pip install -r save_saliency/requirements.txt
+    ```
+2. 명령어를 실행하여 save_saliency/contents/contents1에 저장된 이미지들의 Saliency map을 생성하여 save_saliency/saliency_contents/contents1에 저장
+    ```
+    python3 save_saliency/main.py contents1
+    ```
 
-## .env 파일 설정
-```
-MONGODB_USERNAME=<your username>
-MONGODB_PASSWORD=<your password>
-MONGODB_HOST=localhost
-MONGODB_PORT=<your mongodb port>
-MONGODB_EXPRESS_PORT=<your mongodb-express port>
-MONGODB_DB=<your db name>
-ME_CONFIG_BASICAUTH_USERNAME=<your mongo-express username>
-ME_CONFIG_BASICAUTH_PASSWORD=<your mongo-express password>
+## 3. mongodb_pv.yaml 파일 수정
+1. 명령어를 실행하여 나온 결과(IP)를 nfs의 server에 입력
+    ```
+    ip route | grep eth0 | grep src | sed -n 's/.*src \([0-9\.]*\).*/\1/p'
+    ```
+2. NFS와 연결할 로컬의 디렉터리 경로를 nfs의 path에 입력
+    ```
+    /home/<USER NAME>/eduFocus/bok/save_saliency/saliency_contents
+    ```
 
-```
+## 4. MongoDB 및 Express pod 실행
+1. 명령어를 실행하여 Kubernetes에 Pod 생성
+    ```
+    source apply.sh
+    ```
 
-## 예시 데이터 사용 방법
-```
-curl -L -o saliency_data.tar.gz https://github.com/JooBok/eduFocus/releases/download/v1.0/saliency_data.tar.gz
-```
+## 5. MongoDB에 데이터 저장
+1. 명령어를 실행하여 마운트된 데이터를 MongoDB에 저장
+    ```
+    source mongodb_setting.sh
+    ```
 
-## 실제 데이터 사용하는 경우
-1. Saliency map을 만들 컨텐츠 영상 mp4파일을 contents 디렉터리에 저장해야 합니다.
-2. video_to_image.sh 파일을 실행합니다.
-3. /service/docker-compose up --build -d 명령어를 실행합니다.
+## 5. MongoDB 컬렉션에 데이터 넣기
+- 명령어를 실행하여 MongoDB Pod에 접속
+    ```
+    kubectl exec -it $MONGODB_POD -- bash
+    ```
+- Pod 내부에서 명령어를 실행하여 MongoDB로 데이터 이동
+    ```
+    for FILE in /data/db/contents1/frame_*.bson; do mongorestore --db=saliency_db --collection=contents1 ${FILE}; done
+    ```
+
+# Saliency Map 원리
+- **총 4개의 특징맵으로 Saliency map 생성**
+    1. 강도 특징 맵: 이미지를 가우시안 피라미드로 피라미드 이미지의 중심과 주변의 차이를 계산
+    2. 색상 특징 맵: 피라미드 이미지의 RGB값의 차이를 계산
+    3. 방향 특징 맵: 피라미드에 0,45,90,135도 방향의 Gabor Filter를 적용하여 각 방향의 중심과 주변의 차이를 계산
+    4. 움직임 특징 맵: OpenCV의 OpticalFlow를 활용하여 이전 프레임과의 움직임 차이 계산
+- **4개의 특징맵에 각각 가중치를 부여하여 나온 결과값 합산**
+- **정규화 진행**
+- **노이즈 제거를 위해 양방향 필터 적용**
+### pySaliencyMapDefs.py에서 파라미터 수정하여 컨텐츠별 Saliency map 생성 가능

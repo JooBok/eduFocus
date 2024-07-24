@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # 컨텐츠 이름을 받을 인자 설정
-CONTENTS_NAME="contents2"
+CONTENTS_NAME="contents1"
 
 # MongoDB Pod 이름 설정
 MONGODB_POD=$(kubectl get pods -l app=mongodb -o=jsonpath='{.items[0].metadata.name}')

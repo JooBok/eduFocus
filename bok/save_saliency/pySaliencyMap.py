@@ -3,7 +3,6 @@ import numpy as np
 import pySaliencyMapDefs
 
 class pySaliencyMap:
-    # 초기화
     def __init__(self, width, height):
         self.width  = width
         self.height = height
