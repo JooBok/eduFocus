@@ -15,8 +15,6 @@ gradient boosting regressor 모델을 사용하여 시선 좌표를 예측하는
 5. [모델 설정](#5-모델-설정)
 6. [주요 클래스 및 함수](#6-주요-클래스-및-함수)
 7. [API 엔드포인트](#7-api-엔드포인트)
-8. [처리 흐름](#8-처리-흐름)
-9. [kubernetes](#9-kubernetes)
 
 ## 상세 설명
 
@@ -77,7 +75,7 @@ joblib을 사용하여 gaze 예측 모델(model_x, model_y)을 로드
 ### 7. API 엔드포인트
 •	/gaze (POST): api로 이미지데이터와 메타데이터 POST
 
-### 8. 처리 흐름
+## 처리 흐름
 
 1.	Api gateway에서 비디오 프레임을 /gaze 엔드포인트로 전송
 2.	프레임이 처리되고 GazeDetector를 사용하여 시선 좌표 추정
@@ -89,7 +87,7 @@ joblib을 사용하여 gaze 예측 모델(model_x, model_y)을 로드
 4.	마지막 프레임 처리 시, 중앙 세션에 저장된 시선 좌표를 가져온 후 saliency map과 비교하여 최종 점수가 계산
 5.	최종 결과 aggregator 서비스로 전송
 
-### 9. kubernetes
+## kubernetes
 * HPA
   * cpu 사용량이 50% 넘어갈 시 새로운 pod을 생성
 
