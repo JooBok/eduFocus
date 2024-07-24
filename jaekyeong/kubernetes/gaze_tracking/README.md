@@ -20,11 +20,11 @@ gradient boosting regressor 모델을 사용하여 시선 좌표를 예측하는
 
 ### 1. 라이브러리 및 모듈
 * Flask: 웹 애플리케이션 프레임워크
-*	MediaPipe: 얼굴 및 눈 랜드마크 감지
-*	NumPy: 수치 연산
-*	OpenCV (cv2): 이미지 처리
-*	joblib: 모델 로딩
-*	MongoDB: 데이터 저장 및 검색
+* MediaPipe: 얼굴 및 눈 랜드마크 감지
+* NumPy: 수치 연산
+* OpenCV (cv2): 이미지 처리
+* joblib: 모델 로딩
+* MongoDB: 데이터 저장 및 검색
 
 ### 2. Flask
 모델 api화
