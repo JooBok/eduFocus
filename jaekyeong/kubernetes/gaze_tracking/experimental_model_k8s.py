@@ -465,7 +465,8 @@ def calc(gaze_points: Dict[str, Tuple[int, int]], saliency_map: List[List[Union[
         x, y = gaze_point
         for saliency_per_frame in saliency_map:
             if int(frame_num) == saliency_per_frame[0]:
-                if saliency_per_frame[1][y][x] >= 0.7:
+                saliency_threshold = np.percentile(saliency_per_frame[1], 70)
+                if saliency_per_frame[1][y][x] >= saliency_threshold:
                     count += 1
                     break
     res = count / total_frames if total_frames > 0 else 0
