@@ -1,19 +1,19 @@
 # MongoDB Setting
-## 1. 데이터 준비
-1. save_saliency/contents/contents1 경로에 컨텐츠 영상 파일(mp4)을 넣는다.
+## 1. 데이터 준비(save_saliency 디렉터리에서 실행)
+1. save_saliency/contents/contents1 경로에 컨텐츠 영상 파일(mp4) 저장
 2. 명령어를 실행하여 mp4파일을 20FPS의 이미지로 변환
     ```
-    source save_saliency/video_to_image.sh contents1
+    source video_to_image.sh contents1
     ```
 
-## 2. Saliency map 생성
+## 2. Saliency map 생성(save_saliency 디렉터리에서 실행)
 1. 명령어를 실행하여 Saliency map 생성에 필요한 라이브러리 설치
     ```
-    pip install -r save_saliency/requirements.txt
+    pip install -r requirements.txt
     ```
 2. 명령어를 실행하여 save_saliency/contents/contents1에 저장된 이미지들의 Saliency map을 생성하여 save_saliency/saliency_contents/contents1에 저장
     ```
-    python3 save_saliency/main.py contents1
+    python3 main.py contents1
     ```
 
 ## 3. mongodb_pv.yaml 파일 수정
@@ -47,6 +47,12 @@
     ```
     for FILE in /data/db/contents1/frame_*.bson; do mongorestore --db=saliency_db --collection=contents1 ${FILE}; done
     ```
+
+## Mongo-express로 MongoDB에 저장된 데이터 확인 방법
+```
+MONGO_EXPRESS=$(k get pods -l app=mongo-express -o=jsonpath='{.items[0].metadata.name}')
+kubectl port-forward $MONGO_EXPRESS 8081:8081
+```
 
 # Saliency Map 원리
 - **총 4개의 특징맵으로 Saliency map 생성**
