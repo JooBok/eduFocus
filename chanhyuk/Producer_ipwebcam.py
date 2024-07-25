@@ -80,6 +80,7 @@ class StreamThread(threading.Thread):
 
                 # last_frame_number = frame_number
 
+                # json으로 저장될 형식 지정.
                 frame_data = {
                     'video_id': self.video_id,
                     'ip_address': self.ip_address,
@@ -88,6 +89,7 @@ class StreamThread(threading.Thread):
                     'last_frame_state': False
                 }
 
+                # kafka topic으로 데이터 전송.
                 try:
                     future = producer.send(kafka_topic, frame_data)
                     result = future.get(timeout=10)
@@ -120,19 +122,18 @@ def stop_stream_thread():
         stream_thread.running = False
         stream_thread.join()
 
+# rest api post 요청(시작할 때)
 @app.route('/start_stream', methods=['POST'])
 def start_stream():
     video_id = request.json.get('video_id', 'default_video_id')
-    # duration = request.json.get('duration')  # duration in seconds
     max_frames = request.json.get('max_frames')
     ip_address = request.json.get('ip_address')
     global stream_thread
     stream_thread = StreamThread(video_id, max_frames, ip_address)
     stream_thread.start()
-    # Set a timer to stop the stream after the specified duration
-    # threading.Timer(duration, stop_stream_thread).start()
     return jsonify({"message": "Stream started"}), 200
 
+# rest api post 요청(끝날 때)
 @app.route('/stop_stream', methods=['POST'])
 def stop_stream():
     stop_stream_thread() 
