@@ -11,6 +11,8 @@ import json
 import csv
 import os
 
+frame_dir = 'contents3/'
+
 ### 변경 가능한 변수들은 ctrl + f 에 $를 입력하시면 찾으실 수 있습니다.
 ### RF_reg_calibrate.py에서 저장한 모델을 사용하여 시선 예측하는 파일입니다.
 
@@ -158,7 +160,6 @@ frame = 0
 temp_data = dict()
 
 print("Setting up frame files...")
-frame_dir = 'contents1/'
 try:
     frame_files = [f for f in os.listdir(frame_dir) if f.startswith('frame_') and f.endswith('.png')]
     frame_files.sort()
