@@ -16,7 +16,8 @@ def send_data(url, data):
     else:
         print(f"Failed to send frame {data['frame_number']} to {url}, status code: {response.status_code}")
 
-# 컨슈머에서 
+# 컨슈머에서 프로듀서에서 전송받은 데이터를 polling을 통해 받아서
+save_path경로에 json형태로 저장. 
 def consume_and_save_frames(consumer, save_path, gaze_url, emotion_url):
     while True:
         print('Polling for messages...')
@@ -46,7 +47,7 @@ def consume_and_save_frames(consumer, save_path, gaze_url, emotion_url):
                 if last_frame_state:
                     print(f"Stream ended for video_id {video_id} after {frame_number} frames.")
                     return
-
+# 9092 포트로 데이터 
 if __name__ == '__main__':
     kafka_topic = 'video-stream'
     kafka_bootstrap_servers = ['localhost:9092']
