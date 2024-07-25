@@ -127,10 +127,6 @@ def estimate_head_pose(face_landmarks):
         rotation_matrix = np.eye(3)
     return rotation_matrix
 
-def correct_gaze_vector(gaze_vector, head_rotation):
-    corrected_gaze = np.dot(head_rotation, gaze_vector)
-    return corrected_gaze
-
 ### $ 프레임당 시선좌표 이동속도 제한 ###
 def filter_sudden_changes(new_gaze, prev_gaze, max_change_x=10, max_change_y=10):
     if prev_gaze is None:
@@ -193,10 +189,7 @@ while cap.isOpened():
 
             head_rotation = estimate_head_pose(face_landmarks)
 
-            left_gaze_corrected = correct_gaze_vector(left_gaze, head_rotation)
-            right_gaze_corrected = correct_gaze_vector(right_gaze, head_rotation)
-
-            combined_gaze = calculate_combined_gaze(left_gaze_corrected, right_gaze_corrected, head_rotation, estimated_distance)
+            combined_gaze = calculate_combined_gaze(left_gaze, right_gaze, head_rotation, estimated_distance)
 
             gaze_sequence.append(combined_gaze)
             if len(gaze_sequence) > sequence_length:

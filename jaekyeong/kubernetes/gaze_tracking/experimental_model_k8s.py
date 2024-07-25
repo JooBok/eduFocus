@@ -81,11 +81,10 @@ class GazeDetector:
         :param  -> frame: 처리할 이미지 프레임
         :return -> 추정된 시선 위치 좌표 (x, y) (얼굴이 감지되지 않은 경우 None)
         """
-        image = cv2.flip(frame, 1)
-        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        image_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.face_mesh.process(image_rgb)
 
-        h, w = image.shape[:2]
+        h, w = image_rgb.shape[:2]
 
         if results.multi_face_landmarks:
             for face_landmarks in results.multi_face_landmarks:
@@ -101,10 +100,7 @@ class GazeDetector:
 
                 head_rotation = estimate_head_pose(face_landmarks)
 
-                left_gaze_corrected = correct_gaze_vector(left_gaze, head_rotation)
-                right_gaze_corrected = correct_gaze_vector(right_gaze, head_rotation)
-
-                combined_gaze = calculate_combined_gaze(left_gaze_corrected, right_gaze_corrected, head_rotation, estimated_distance)
+                combined_gaze = calculate_combined_gaze(left_gaze, right_gaze, head_rotation, estimated_distance)
 
                 self.gaze_sequence.append(combined_gaze)
 
@@ -390,17 +386,6 @@ def estimate_head_pose(face_landmarks: mp.framework.formats.landmark.Landmark) -
         print(f"Error in head pose estimation: {e}")
         rotation_matrix = np.eye(3)
     return rotation_matrix
-
-def correct_gaze_vector(gaze_vector: np.ndarray, head_rotation: np.ndarray) -> np.ndarray:
-    """
-    머리 회전을 고려하여 시선 벡터를 보정하는 함수
-    
-    :param  -> gaze_vector: 원본 시선 벡터
-    :param  -> head_rotation: 머리 회전 행렬
-    :return -> 보정된 시선 벡터
-    """
-    corrected_gaze = np.dot(head_rotation, gaze_vector)
-    return corrected_gaze
 
 def filter_sudden_changes(new_gaze: np.ndarray, prev_gaze: Optional[np.ndarray], max_change_x: float = 15, max_change_y: float = 15) -> np.ndarray:
     """

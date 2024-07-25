@@ -67,15 +67,33 @@ class GazeCalibration:
         self.collected_data[key].append(gaze_point)
     
     ### $ 데이터 증강 ###
-    def augment_data(self, X, y, num_augmented = 777):
+    def augment_data(self, X, y):
+        num_augmented = len(X) * 2
         augmented_X, augmented_y = [], []
+
         for _ in range(num_augmented):
             idx = np.random.randint(0, len(X))
-            noise = np.random.normal(0, 0.01, X[idx].shape)
-            augmented_X.append(X[idx] + noise)
-            augmented_y.append(y[idx])
-        return np.vstack([X, np.array(augmented_X)]), np.concatenate([y, augmented_y])
+            original_data = X[idx]
+            augmented_data = original_data.copy()
 
+            ### 작은 회전 적용 ###
+            rotation_angle = np.random.uniform(-5, 5)
+            rotation = Rotation.from_euler('xyz', [0, 0, np.radians(rotation_angle)])
+            augmented_data[:3] = rotation.apply(augmented_data[:3])
+
+            ### 작은 스케일 변화 적용 ###
+            scale_factor = np.random.uniform(0.95, 1.05)
+            augmented_data *= scale_factor
+
+            ### 작은 노이즈 추가 ###
+            noise = np.random.normal(0, 0.02, augmented_data.shape)
+            augmented_data += noise
+
+            augmented_X.append(augmented_data)
+            augmented_y.append(y[idx])
+
+        return np.vstack([X, np.array(augmented_X)]), np.concatenate([y, augmented_y])
+    
     def prepare_sequence(self, data):
         X, y = [], []
         for key, points in data.items():
@@ -232,11 +250,6 @@ def estimate_head_pose(face_landmarks):
         rotation_matrix = np.eye(3)
     return rotation_matrix
 
-### 머리 회전과 시선 벡터 추적 ###
-def correct_gaze_vector(gaze_vector, head_rotation):
-    corrected_gaze = np.dot(head_rotation, gaze_vector)
-    return corrected_gaze
-
 ### 왼쪽시선과 오른쪽시선 결합 (평균) ###
 def calculate_combined_gaze(left_gaze, right_gaze, head_rotation, distance):
     combined_gaze = (left_gaze + right_gaze) / 2
@@ -277,10 +290,7 @@ while cap.isOpened():
 
             head_rotation = estimate_head_pose(face_landmarks)
 
-            left_gaze_corrected = correct_gaze_vector(left_gaze, head_rotation)
-            right_gaze_corrected = correct_gaze_vector(right_gaze, head_rotation)
-
-            combined_gaze = calculate_combined_gaze(left_gaze_corrected, right_gaze_corrected, head_rotation, estimated_distance)
+            combined_gaze = calculate_combined_gaze(left_gaze, right_gaze, head_rotation, estimated_distance)
 
             gaze_sequence.append(combined_gaze)
             if len(gaze_sequence) > calibration.sequence_length:
