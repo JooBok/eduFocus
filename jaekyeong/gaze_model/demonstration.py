@@ -10,6 +10,9 @@ import time
 import csv
 import os
 
+image_folder = './contents3'
+output_csv = 'gaze_small.csv'
+
 mp_face_mesh = mp.solutions.face_mesh
 face_mesh = mp_face_mesh.FaceMesh(
     refine_landmarks=True,
@@ -191,20 +194,17 @@ gaze_sequence = []
 sequence_length = 10
 prev_gaze = None
 
-image_folder = './folder' 
-output_csv = 'gaze_csv.csv'
-
 with open(output_csv, 'w', newline='') as csvfile:
     csv_writer = csv.writer(csvfile)
     csv_writer.writerow(['frame', 'x', 'y']) 
 
     for _ in range(1, 801):
         if _ <= 9:
-            image_path = os.path.join(image_folder, f'frame-000{_}.png')
+            image_path = os.path.join(image_folder, f'frame_000{_}.png')
         elif _ <= 99:
-            image_path = os.path.join(image_folder, f'frame-00{_}.png')
+            image_path = os.path.join(image_folder, f'frame_00{_}.png')
         else:
-            image_path = os.path.join(image_folder, f'frame-0{_}.png')            
+            image_path = os.path.join(image_folder, f'frame_0{_}.png')            
 
         if not os.path.exists(image_path):
             print(f"Warning: {image_path} does not exist. Skipping.")
