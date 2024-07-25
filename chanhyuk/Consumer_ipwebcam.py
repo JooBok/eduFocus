@@ -1,7 +1,3 @@
-##############################################################################################################################
-# 큐 제거, 한번 요청한 사항은 한번 밖에 수행 안됨. 다시 말해서 새로 받고 싶으면 다시 프로듀서 부터 시작해서 메시지 전송해야됨.
-# 모든 메시지 받음. -> fetch_max_bytes랑 max_partition_fetch_bytes 값 조정 해서 해결.
-##############################################################################################################################
 from kafka import KafkaConsumer
 import requests
 import json
@@ -12,6 +8,7 @@ import time
 gaze_url = os.getenv('GAZE_URL')
 emotion_url = os.getenv("EMOTION_URL")
 
+# gaze 모델과 emotion 모델의 url로 스트림한 데이터를 보냄.
 def send_data(url, data):
     response = requests.post(url, json=data)
     if response.status_code == 200:
@@ -19,6 +16,7 @@ def send_data(url, data):
     else:
         print(f"Failed to send frame {data['frame_number']} to {url}, status code: {response.status_code}")
 
+# 컨슈머에서 
 def consume_and_save_frames(consumer, save_path, gaze_url, emotion_url):
     while True:
         print('Polling for messages...')
