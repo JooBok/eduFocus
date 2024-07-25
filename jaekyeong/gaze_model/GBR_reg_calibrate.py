@@ -54,19 +54,18 @@ class GazeCalibration:
         self.sequence_length = sequence_length
 
         self.param_grid = {
-            'n_estimators': [250, 400, 500],
-            'learning_rate': [0.01, 0.05, 0.1],
+            'n_estimators': [100, 200, 300],
+            'learning_rate': [0.01, 0.03, 0.05],
             'max_depth': [3, 4],
             'min_samples_split': [2, 5],
-            'min_samples_leaf': [1, 2, 4],
+            'min_samples_leaf': [1, 3],
             'subsample': [0.8, 1.0],
-            'max_features': ['sqrt', 'log2']
+            'max_features': ['sqrt', None]
         }
 
     def collect_data(self, gaze_point, key):
         self.collected_data[key].append(gaze_point)
     
-    ### $ 데이터 증강 ###
     def augment_data(self, X, y):
         num_augmented = len(X) * 2
         augmented_X, augmented_y = [], []
@@ -93,7 +92,7 @@ class GazeCalibration:
             augmented_y.append(y[idx])
 
         return np.vstack([X, np.array(augmented_X)]), np.concatenate([y, augmented_y])
-    
+
     def prepare_sequence(self, data):
         X, y = [], []
         for key, points in data.items():
@@ -140,8 +139,8 @@ class GazeCalibration:
         y_combined = np.vstack([y_old, y_new]) if len(y_old) > 0 else y_new
 
         if len(X_combined) > 0:
-            X_combined, y_combined = self.augment_data(X_combined, y_combined)
-            X_train, X_test, y_train, y_test = train_test_split(X_combined, y_combined, test_size=0.2, random_state=777)
+            X_augmented, y_augmented = self.augment_data(X_combined, y_combined)
+            X_train, X_test, y_train, y_test = train_test_split(X_augmented, y_augmented, test_size=0.2, random_state=777)
 
             gb_regressor = GradientBoostingRegressor(random_state=777)
             grid_search = GridSearchCV(estimator=gb_regressor, param_grid=self.param_grid, 
