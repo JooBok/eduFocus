@@ -244,7 +244,7 @@ def create_session(session_id: str) -> None:
 ################################# GBR 모델 인풋 만드는 class, 함수 #################################
 
 class GazeBuffer:
-    def __init__(self, buffer_size=2, smoothing_factor=0.3):
+    def __init__(self, buffer_size=2, smoothing_factor=0.4):
         self.buffer = []
         self.buffer_size = buffer_size
         self.smoothing_factor = smoothing_factor
@@ -387,7 +387,7 @@ def estimate_head_pose(face_landmarks: mp.framework.formats.landmark.Landmark) -
         rotation_matrix = np.eye(3)
     return rotation_matrix
 
-def filter_sudden_changes(new_gaze: np.ndarray, prev_gaze: Optional[np.ndarray], max_change_x: float = 15, max_change_y: float = 15) -> np.ndarray:
+def filter_sudden_changes(new_gaze: np.ndarray, prev_gaze: Optional[np.ndarray], max_change_x: float = 10, max_change_y: float = 10) -> np.ndarray:
     """
     시선 변화 상한을 정하는 함수
     
