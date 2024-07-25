@@ -343,7 +343,7 @@ def calculate_distance(iris_landmarks: List[np.ndarray], image_height: int) -> f
     estimated_distance = (1 / distance) * image_height
     return estimated_distance
 
-def get_center(landmarks: List[mp.framework.formats.landmark.Landmark]) -> np.ndarray:
+def get_center(landmarks) -> np.ndarray:
     """
     랜드마크들의 중심점을 계산하는 함수
 
@@ -365,7 +365,7 @@ def estimate_gaze(eye_center: np.ndarray, iris_center: np.ndarray, estimated_dis
     gaze_point = eye_center + eye_vector * estimated_distance
     return gaze_point
 
-def estimate_head_pose(face_landmarks: mp.framework.formats.landmark.Landmark) -> np.ndarray:
+def estimate_head_pose(face_landmarks) -> np.ndarray:
     """
     얼굴 랜드마크를 기반으로 머리 회전 추정 함수
     
