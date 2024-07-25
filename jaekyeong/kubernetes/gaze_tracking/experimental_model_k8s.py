@@ -93,7 +93,7 @@ class GazeDetector:
                 left_eye = get_center(face_landmarks.landmark[33:42])[:3]
                 right_eye = get_center(face_landmarks.landmark[263:272])[:3]
 
-                estimated_distance = calculate_distance([left_iris, right_iris], image.shape[0])
+                estimated_distance = calculate_distance([left_iris, right_iris], image_rgb.shape[0])
 
                 left_gaze = estimate_gaze(left_eye, left_iris, estimated_distance)
                 right_gaze = estimate_gaze(right_eye, right_iris, estimated_distance)
