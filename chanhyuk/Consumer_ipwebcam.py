@@ -35,7 +35,8 @@ def consume_and_save_frames(consumer, save_path, gaze_url, emotion_url):
                 #gaze와 emotion URL로 동기 요청 보내기
                 send_data(gaze_url, frame_data)
                 send_data(emotion_url, frame_data)
-
+                
+                
                 video_id = frame_data['video_id']
                 frame_number = frame_data['frame_number']
                 json_filename = os.path.join(save_path, f"{video_id}_frame_{frame_number}.json")
@@ -56,6 +57,7 @@ if __name__ == '__main__':
     if not os.path.exists(save_path):
         os.makedirs(save_path)
 
+    # kafka 컨슈머 설정. 
     consumer = KafkaConsumer(
         kafka_topic,
         bootstrap_servers=kafka_bootstrap_servers,
