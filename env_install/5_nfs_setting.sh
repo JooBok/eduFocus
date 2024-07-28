@@ -2,7 +2,7 @@
 MINIKUBE_IP=$(minikube ip)
 
 # NFS 서버에 저장할 디렉터리 경로 설정
-cd ~/eduFocus/bok/kubernetes/save_saliency/saliency_contents
+cd ~/eduFocus/bok/save_saliency/saliency_contents
 NFS_LOCAL_PATH=$(pwd)
 cd ~
 
