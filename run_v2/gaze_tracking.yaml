@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: gaze-tracking
-        image: pepi10/gaze-tracking-v2-test:latest
+        image: pepi10/gaze-test:latest
         ports:
         - containerPort: 5000
         env:
