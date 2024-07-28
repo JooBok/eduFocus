@@ -71,9 +71,10 @@ def create_session(session_id: str) -> None:
 def calc(final_result):
     total_frames = len(final_result)
     count = sum(1 for result in final_result.values() if result == 1)
+    count2 = sum(0.5 for result in final_result.values() if result == 0.5)
     logger.info(f"total_frames: {total_frames}")
     logger.info(f"1's Count: {count}")
-    res = count / total_frames if total_frames > 0 else 0
+    res = (count + count2) / total_frames if total_frames > 0 else 0
     res = round(res, 4) * 100
     return res
 
