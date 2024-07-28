@@ -28,37 +28,29 @@ def load_models():
     global model_x, model_y
     with model_lock:
         if model_x is None or model_y is None:
-            model_x, model_y = joblib.load('/app/model/gaze_model.pkl')
+            model_x, model_y = joblib.load('/app/model/new_gaze_model.pkl')
 
 load_models()
 ################################## Mongo setting ##################################
 def mongodb_client():
     return MongoClient(MONGO_URI)
-
-def extract_saliencyMap(video_id: str) -> List[List[Union[int, np.ndarray]]]:
-    """
-    video_id에 해당하는 saliency map 데이터를 MongoDB에서 추출하는 함수
-
-    :param  -> video_id: 비디오 ID
-    :return -> frame 번호와 saliency map을 포함하는 2차원 리스트
-    """
+ 
+def process_saliency(video_id: str, frame_num: int, gaze_point: Tuple[int, int]) -> int:
     client = mongodb_client()
     db = client[MONGO_DB]
     collection = db[video_id]
-    
-    all_data = collection.find()
-    extracted_data = []
 
-    for document in all_data:
-        frame_num = document.get('frame_num')
-        saliency_map = document.get('saliency_map')
-        
-        if frame_num is not None and saliency_map is not None:
-            extracted_data.append([frame_num, saliency_map])
-        else:
-            logger.error("Error: 'frame_num' or 'saliency_map' not found in the document")
+    saliency_data = collection.find_one({"frame_num": frame_num}, {"saliency_map": 1, "_id": 0})
 
-    return extracted_data
+    if saliency_data and 'saliency_map' in saliency_data:
+        saliency_map = saliency_data['saliency_map']
+        x, y = gaze_point
+        saliency_threshold = np.percentile(saliency_map, 70)
+        return 1 if saliency_map[y][x] >= saliency_threshold else 0
+    else:
+        logger.error(f"Saliency map not found for frame {frame_num}")
+        return 0
+
 ################################### Session ###################################
 class GazeDetector:
     def __init__(self, session_id):
@@ -188,21 +180,17 @@ def get_session(session_id: str) -> Dict[str, Any]:
         logger.error(f"Request failed when getting session: {e}")
         return {}
 
-def update_session(session_id: str, frame_number: int, gaze_data: Tuple[int, int]) -> None:
-    """
-    세션 api를 통하여 data를 update(append)하는 함수
-
-    :param -> session_id
-    :param -> frame_number
-    :param -> gaze_data: 시선 데이터 (x, y)
-    """
+def update_session(session_id: str, frame_number: int, gaze_data: Tuple[int, int], saliency_result: int) -> None:
     try:
         update_data = {
             "component": "gaze_tracking",
             "data": {
                 "components": {
                     "gaze_tracking": {
-                        str(frame_number): gaze_data
+                        str(frame_number): {
+                            "gaze": gaze_data,
+                            "saliency_match": saliency_result
+                        }
                     }
                 }
             }
@@ -214,7 +202,7 @@ def update_session(session_id: str, frame_number: int, gaze_data: Tuple[int, int
         elif response.status_code == 404:
             logger.warning(f"Session not found when updating. Creating new session for {session_id}")
             create_session(session_id)
-            update_session(session_id, frame_number, gaze_data)
+            update_session(session_id, frame_number, gaze_data, saliency_result)
         else:
             logger.error(f"Failed to update session. Status code: {response.status_code}, Response: {response.text}")
     except requests.RequestException as e:
@@ -435,29 +423,13 @@ def calculate_combined_gaze(left_gaze: np.ndarray, right_gaze: np.ndarray, head_
     head_rotation_euler = Rotation.from_matrix(head_rotation).as_euler('xyz')
     return np.concatenate([combined_gaze, head_rotation_euler, [distance]])
 
-def calc(gaze_points: Dict[str, Tuple[int, int]], saliency_map: List[List[Union[int, np.ndarray]]]) -> float:
-    """
-    시선 위치와 saliency map을 비교하여 점수를 계산하는 함수
-    
-    :param  -> gaze_points: 프레임별 시선 위치 딕셔너리
-    :param  -> saliency_map: saliency map 데이터
-    :return -> 점수(최종 output)
-    """
-    count = 0
-    total_frames = len(gaze_points)
-    logger.info(f"calc -> gaze_points {gaze_points}")
-    for frame_num, gaze_point in gaze_points.items():
-        x, y = gaze_point
-        for saliency_per_frame in saliency_map:
-            if int(frame_num) == saliency_per_frame[0]:
-                saliency_threshold = np.percentile(saliency_per_frame[1], 70)
-                if saliency_per_frame[1][y][x] >= saliency_threshold:
-                    count += 1
-                    break
-    res = count / total_frames if total_frames > 0 else 0
-    if res > 0:
-        res = round(res, 4) * 100
-    return res
+def calculate_final_score(session_data: Dict[str, Any]) -> float:
+    gaze_data = session_data.get('gaze_tracking', {})
+    total_frames = len(gaze_data)
+    matches = sum(frame_data.get('saliency_match', 0) for frame_data in gaze_data.values())
+
+    score = matches / total_frames if total_frames > 0 else 0
+    return round(score * 100, 2)
 ################################# Send result #################################
 def send_result(final_result: float, video_id: str, ip_address: str) -> None:
     """
@@ -497,19 +469,19 @@ def process_frame():
         nparr = np.frombuffer(frame_data, np.uint8)
         frame = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-        result = gaze_detector.process_single_frame(frame)
+        gaze_result = gaze_detector.process_single_frame(frame)
 
-        logger.info(f"Frame {frame_num} processed. Result: {result}")
-        if result:
-            update_session(session_id, frame_num, result)
+        logger.info(f"Frame {frame_num} processed. Gaze result: {gaze_result}")
+        if gaze_result:
+            saliency_result = process_saliency(video_id, frame_num, gaze_result)
+            update_session(session_id, frame_num, gaze_result, saliency_result)
 
         return jsonify({"status": "success", "message": "Frame processed"}), 200
 
     if last_frame:
-        saliency_map = extract_saliencyMap(video_id)
         central_session_data = get_session(session_id)
         logger.info(f" central_session_data : {central_session_data}")
-        final_res = calc(central_session_data, saliency_map)
+        final_res = calculate_final_score(central_session_data)
         send_result(final_res, video_id, ip_address)
         
         if session_id in gaze_detectors:
