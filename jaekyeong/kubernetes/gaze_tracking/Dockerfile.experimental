@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
 COPY experimental_model_k8s.py .
-COPY experimental_model/gaze_model.pkl ./model/
+COPY experimental_model/new_gaze_model.pkl ./model/
 
 EXPOSE 5000
 
