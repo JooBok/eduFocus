@@ -45,7 +45,7 @@ def process_saliency(video_id: str, frame_num: int, gaze_point: Tuple[int, int])
     if saliency_data and 'saliency_map' in saliency_data:
         saliency_map = saliency_data['saliency_map']
         x, y = gaze_point
-        saliency_threshold = np.percentile(saliency_map, 70)
+        saliency_threshold = np.percentile(saliency_map, 10)
         return 1 if saliency_map[y][x] >= saliency_threshold else 0
     else:
         logger.error(f"Saliency map not found for frame {frame_num}")
@@ -424,9 +424,8 @@ def calculate_combined_gaze(left_gaze: np.ndarray, right_gaze: np.ndarray, head_
     return np.concatenate([combined_gaze, head_rotation_euler, [distance]])
 
 def calculate_final_score(session_data: Dict[str, Any]) -> float:
-    gaze_data = session_data.get('gaze_tracking', {})
-    total_frames = len(gaze_data)
-    matches = sum(frame_data.get('saliency_match', 0) for frame_data in gaze_data.values())
+    total_frames = len(session_data)
+    matches = sum(frame_data.get('saliency_match', 0) for frame_data in session_data.values())
 
     score = matches / total_frames if total_frames > 0 else 0
     return round(score * 100, 2)
