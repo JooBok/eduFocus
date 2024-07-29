@@ -45,7 +45,7 @@ def process_saliency(video_id: str, frame_num: int, gaze_point: Tuple[int, int])
     if saliency_data and 'saliency_map' in saliency_data:
         saliency_map = saliency_data['saliency_map']
         x, y = gaze_point
-        saliency_threshold = np.percentile(saliency_map, 10)
+        saliency_threshold = np.percentile(saliency_map, 70)
         return 1 if saliency_map[y][x] >= saliency_threshold else 0
     else:
         logger.error(f"Saliency map not found for frame {frame_num}")
