@@ -26,6 +26,7 @@ def mk_session() -> Tuple[Any, int]:
 
     ### session make ###
     session_data: Dict[str, Any] = {
+            "session_id": session_id,
             "ip_address": ip_address,
             "video_id": video_id,
             "created_at": datetime.now().isoformat(),
